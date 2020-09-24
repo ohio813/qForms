@@ -11,6 +11,7 @@ var formJSON = {
 "actionBackText":"אחורה",
 "actionNextText":"הבא",
 "actionSubmitText":"הגש שאלון",
+"actionClearText":"נקה תשובות",
 "otherText":"אחר:",
 "chooseText":"יש לבחור",
 "commentsText":"הערות:",
@@ -188,6 +189,22 @@ function loadInputState(index)
 	}
 }
 
+function clearStateBySegment(segIndex)
+{
+	// Remove all possible type of given segment.
+	// See coupled generateName.
+	_removeKeysWithPrefix(formState, "q_checkbox_" + segIndex);
+	_removeKeysWithPrefix(formState, "q_inputline_" + segIndex);
+	_removeKeysWithPrefix(formState, "q_multi_" + segIndex);
+	_removeKeysWithPrefix(formState, "q_dropdown_" + segIndex);
+	_removeKeysWithPrefix(formState, "q_slider_" + segIndex);
+}
+
+function generateName(element, segIndex, eIndex)
+{
+	return "q_" + element.type + "_" + segIndex + "_" + eIndex;
+}
+
 function focusOnRequiredField(fieldName)
 {
 	// BUGBUG
@@ -269,10 +286,18 @@ function submitForm()
 
 	// Show thank you message.
 	document.getElementById("main").innerHTML = formJSON.actionThanksText;
+	// Let the user close page without a warning.
+	window.onbeforeunload = null;
 }
 
 function doAction(type, index, direction)
 {
+	if (type == "clear") {
+		clearStateBySegment(index);
+		showSegment(index);
+		return;
+	}
+
 	// Step 1: Have to record current user's input state.
 	saveInputState();
 	
@@ -316,11 +341,6 @@ function handleButtons(index)
 	return output;
 }
 
-function generateName(element, segIndex, eIndex)
-{
-	return "q_" + element.type + "_" + segIndex + "_" + eIndex;
-}
-
 function handleElement(element, segIndex, eIndex)
 {
 	var i;
@@ -344,7 +364,10 @@ function handleElement(element, segIndex, eIndex)
 		}
 		if (element.hasOwnProperty("other") && (element.other == 1)) {
 			// Add a text-input field that auto selects the corresponding radio button automatically upon entering input.
-			output += "<input type='radio' name='" + name + "' value='" + max + "'>" + formJSON.otherText + "<input type='text' name='" + name + "_other' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
+			textName = name + "_other";
+			// Add feature that focuses & selects the other input field when selecting its radio.
+			output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formJSON.otherText;
+			output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
 			output += "<br>"; // REMOVE ME
 			max++;
 		}
@@ -365,7 +388,10 @@ function handleElement(element, segIndex, eIndex)
 		}
 		if (element.hasOwnProperty("other") && (element.other == 1)) {
 			// Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
-			output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "'>" + formJSON.otherText + "<input type='text' name='" + name + "_other' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
+			textName = name + "_other";
+			// Add feature that focuses & selects the other input field when clicking on its check-box.
+			output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); }'>" + formJSON.otherText;
+			output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
 			output += "<br>"; // REMOVE ME
 			max++;
 		}
@@ -410,8 +436,10 @@ function handleQuestions(seg, segIndex)
 		output += "&nbsp;"; // REMOVE ME
 		// "slide":[MIN, MAX, NOTEXT, YESTEXT]
 		var name = generateName({"type":"slider"}, segIndex, i);
+		// Feature the fugly hack so double clicking a radio actually deselecting it.
+		var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name +" = this; };'";
 		for (var j = seg.slide[0]; j <= seg.slide[1]; j++) {
-			output += "<input type='radio' name='" + name + "' value='" + (j - seg.slide[0]) + "'>" + j;
+			output += "<input type='radio' name='" + name + "' value='" + (j - seg.slide[0]) + "' onclick='" + onclickFunc + "'>" + j;
 		}
 		output += "&nbsp;"; // REMOVE ME
 		output += seg.slide[2]; // NO.
@@ -419,7 +447,11 @@ function handleQuestions(seg, segIndex)
 		output += "<br>"; // REMOVE ME
 	}
 	
-	if (seg.hasOwnProperty("comments") && seg.comments == 1) {
+	if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
+		output += "<button onclick='doAction(\"clear\", " + segIndex + ", 0)'>" + formJSON.actionClearText + "</button>";
+	}
+	
+	if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
 		output += "<h3>" + formJSON.commentsText + "</h3>";
 		var name = generateName({"type":"comments"}, segIndex, 0);
 		output += "<textarea rows=10 cols=80 type='text' name='" + name + "'></textarea>";
