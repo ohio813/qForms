@@ -1,0 +1,503 @@
+<html>
+<head>
+<script language="javascript">
+
+// TODO: add navigation history for next/back buttons???
+// TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
+
+var formJSON = {
+"postURL":"http://example.com/submit.php",
+"dir":"rtl",
+"actionBackText":"אחורה",
+"actionNextText":"הבא",
+"actionSubmitText":"הגש שאלון",
+"otherText":"אחר:",
+"chooseText":"יש לבחור",
+"commentsText":"הערות:",
+"requiredText":"יש למלא את השדה הזה",
+"submissionText":"סיימת את השאלון! כל הכבוד, האם תרצה להגיש אותו כעת?",
+"actionThanksText":"<h3>תודה שענית על השאלות שלנו!</h3>",
+"segments" : [
+	{
+		"type": "segment",
+		"title": "שאלון לדוגמה",
+		"text": "זהו שאלון לדוגמה",
+		"elements": []
+	},
+	{
+	"type":"questions",
+	"required":1,
+	"slide":[1, 7, "כן", "לא"],
+	"text":``,
+	"subQuestions" : [
+		"האם זו שאלת בדיקה?",
+		"האם גם זו שאלת בדיקה?",
+		"האם השאלות מעלה הן שאלות בדיקה?",
+	]
+	},
+]
+};
+
+
+// UTILS
+
+function _formatText(text)
+{
+	return text.replace(/(?:\r\n|\r|\n)/g, '<br>');
+}
+
+function _removeKeysWithPrefix(dict, prefix)
+{
+	toRemove = [];
+	for (var k in dict) {
+		if (k.search(prefix) != -1) {
+			toRemove.push(k);
+		}
+	}
+	while (k = toRemove.pop()) {
+		delete dict[k];
+	}
+}
+
+// GLOBALS:
+// This holds full user's input state.
+var formState = {};
+// Holds the array of required fields of the currently displayed elements in the segment (from top to bottom for appropriate UX).
+var requiredFields = []; // Contains list of all required element names and their max number of options (dropdown, multi, etc): (name, max-options) pairs.
+
+// This function scans all input elements and stores their state.
+function saveInputState()
+{
+	var i;
+	
+	// Scan all marked check-boxes in the current page.
+	var checkboxes = document.querySelectorAll("input[type=checkbox]");
+	for (i = 0; i < checkboxes.length; i++) {
+		if (checkboxes[i].checked) {
+			// Remember there are multiple options concurrently so make name distinct.
+			formState[checkboxes[i].name] = checkboxes[i].value;
+		}
+		else {
+			// Remove any checks that user might have unselected.
+			delete formState[checkboxes[i].name];
+		}
+	}
+
+	// Scan all selected multi-choices in the current page.
+	var multis = document.querySelectorAll("input[type=radio]:checked");
+	for (i = 0; i < multis.length; i++) {
+		// Remove any base key so we don't have stale ones.
+		_removeKeysWithPrefix(formState, multis[i].name);
+
+		formState[multis[i].name + "_" + multis[i].value] = multis[i].value;
+	}
+
+	// Scan all drop-downs in the current page.
+	var drops = document.querySelectorAll("select");
+	for (i = 0; i < drops.length; i++) {
+		// Remove any base key so we don't have stale ones.
+		_removeKeysWithPrefix(formState, drops[i].name);
+
+		formState[drops[i].name] = drops[i].value;
+	}
+	
+	// Scan all input-fields in the current page.
+	var texts = document.querySelectorAll("input[type=text]");
+	for (i = 0; i < texts.length; i++) {
+		if (texts[i].value.length > 0) {
+			formState[texts[i].name] = texts[i].value;
+		}
+		else {
+			// Remove stale key.
+			delete formState[texts[i].name];
+		}
+	}
+	
+	// Scan all textarea-input-fields in the current page.
+	var texts = document.querySelectorAll("textarea");
+	for (i = 0; i < texts.length; i++) {
+		if (texts[i].value.length > 0) {
+			formState[texts[i].name] = texts[i].value;
+		}
+		else {
+			// Remove stale key.
+			delete formState[texts[i].name];
+		}
+	}
+}
+
+// This function scans the state and updates the relevant displayed elements accordingly.
+function loadInputState(index)
+{
+	// Technically we're scanning the displayed elements and see if they have a stored state.
+	// Scan all marked check-boxes in the current page.
+	var checkboxes = document.querySelectorAll("input[type=checkbox]");
+	for (i = 0; i < checkboxes.length; i++) {
+		for (var k in formState) {
+			if (k.search(checkboxes[i].name) != -1) {
+				document.getElementsByName(checkboxes[i].name)[0].checked = 1;
+				break;
+			}
+		}
+	}
+	
+	// Scan all selected multi-choices in the current page.
+	var multis = document.querySelectorAll("input[type=radio]");
+	for (i = 0; i < multis.length; i++) {
+		for (var k in formState) {
+			if (k.search(multis[i].name) != -1) {
+				if ((k.search("_other") == -1) || (formState.hasOwnProperty(k + "_other") == true)) {
+					document.getElementsByName(multis[i].name)[formState[k]].checked = 1;
+					break;
+				}
+			}
+		}
+	}
+	
+	// Scan all the drop-downs in the current page.
+	var drops = document.querySelectorAll("select");
+	for (i = 0; i < drops.length; i++) {
+		if (formState.hasOwnProperty(drops[i].name)) {
+			e = document.getElementsByName(drops[i].name)[0];
+			if (e != undefined) {
+				e.selectedIndex = formState[drops[i].name];
+			}
+		}
+	}
+
+	// Restore all input-fields.
+	texts = document.querySelectorAll("input[type=text]");
+	for (i = 0; i < texts.length; i++) {
+		if (formState.hasOwnProperty(texts[i].name)) {
+			e = document.getElementsByName(texts[i].name)[0];
+			if (e != undefined) {
+				e.value = formState[texts[i].name];
+			}
+		}
+	}
+
+	// Restore all textarea-input-fields.
+	texts = document.querySelectorAll("textarea");
+	for (i = 0; i < texts.length; i++) {
+		if (formState.hasOwnProperty(texts[i].name)) {
+			e = document.getElementsByName(texts[i].name)[0];
+			if (e != undefined) {
+				e.value = formState[texts[i].name];
+			}
+		}
+	}
+}
+
+function focusOnRequiredField(fieldName)
+{
+	// BUGBUG
+	///--------------
+	// this should take the user to the required field and tell the user it should be filled in.
+	// e.g. By adding a red mark and a red text saying "this field is required" from formJSON.requiredText.
+	// Required to insert the sentence below the field's segment.
+	// *****MAYBE REQUIRES A NEW DIV for this*******
+	// Change segment CSS to 'required'...
+	
+	return;
+}
+
+// Scans to see whether all required fields are filled.
+// Otherwise lets the user know she needs to fill it in.
+// Stops upon the first input field that isn't filled in.
+// If all's good then true is returned, otherwise false.
+function enforceInput()
+{
+	// By default assuming all fields are filled.
+	var okay = true;
+	for (i = 0; i < requiredFields.length; i++) {
+		// Cross check against the formState if there's some input there.
+		var found = false;
+		for (var k in formState) {
+			fieldName = requiredFields[i][0];
+			maxOptions = requiredFields[i][1] - 1;
+			if (k.search(fieldName) != -1) {
+				// If there's any text input, make sure it's not empty (we don't care about white space).
+				if (k.search("inputline") != -1) {
+					if (document.getElementsByName(fieldName)[0].value.length > 0) found = true;
+				}
+				else if (k.search("multi") != -1) {
+					// Examine the currently selected choice.
+					selected = formState[k];
+					// We found an item, so user filled it in, unless it's a text and it's empty.
+					found = true;
+					// See how many options the multi-choice has. If it's the last one, see if there's a text input field.
+					if (selected == maxOptions) {
+						otherField = document.getElementsByName(fieldName + "_other");
+						// Make sure text input field is not empty.
+						if ((otherField.length > 0) && (otherField[0].value.length == 0)) found = false;
+					}
+					break;
+				}
+				else if (k.search("dropdown") != -1) {
+					// Make sure the default (first choice) isn't selected, means user selected something.
+					if (document.getElementsByName(fieldName)[0].selectedIndex > 0) found = true;
+				}
+				else if (k.search("checkbox") != -1) {
+					// As long as there's some checkbox marked, we're good.
+					found = true;
+				}
+				else throw "Type not supported!";
+				break;
+			}
+		}
+		// If we didn't find an input for the required field, we can fail now.
+		if (!found) {
+			console.log("Input is required for " + requiredFields[i]);
+			focusOnRequiredField(requiredFields[i]);
+			okay = false;
+			break;
+		}
+	}
+
+	return okay;
+}
+
+function submitForm()
+{
+	// HTTP POST request with user's input.
+    var http = new XMLHttpRequest();
+    http.open("POST", formJSON.postURL, true);
+    http.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+    var params = "blob=" + JSON.stringify(formState);
+    http.send(params);
+    //http.onload = function() { alert(http.responseText); }
+
+	// Show thank you message.
+	document.getElementById("main").innerHTML = formJSON.actionThanksText;
+}
+
+function doAction(type, index, direction)
+{
+	// Step 1: Have to record current user's input state.
+	saveInputState();
+	
+	// Step 2: Have to check all required fields are filled, else re-focus user and show error.
+	// Do it after step 1 as we will be using the currently stored input state.
+	// Always let going backwards, so enforce on forward.
+	if ((direction == 1) && !enforceInput()) {
+		// Don't continue if not all fields are filled.
+		return;
+	}
+
+	// Step 3: Do action.
+	if (type == "submit") {
+		submitForm();
+	}
+	else if (type == "move") {
+		// The index is already the correct one whether forward or backward.
+		showSegment(index);
+	}
+}
+
+function handleButtons(index)
+{
+	// First page has only one button: next.
+	if (index == 0) {
+		return "<button onclick='doAction(\"move\", 1, 1)'>" + formJSON.actionNextText + "</button>";
+	}
+	
+	// All other pages always have: back.
+	var output = "<button onclick='doAction(\"move\", " + (index - 1) + ", -1)'>" + formJSON.actionBackText + "</button>";
+	
+	// Last page has button: submit.
+	if (index == formJSON.segments.length - 1) {
+		output += "<button onclick='doAction(\"submit\", 0, 0)'>" + formJSON.actionSubmitText + "</button>";
+	}
+	else {
+		// Any other page: next.
+		output += "<button onclick='doAction(\"move\", " + (index + 1) + ", 1)'>" + formJSON.actionNextText + "</button>";
+	}
+	
+	return output;
+}
+
+function generateName(element, segIndex, eIndex)
+{
+	return "q_" + element.type + "_" + segIndex + "_" + eIndex;
+}
+
+function handleElement(element, segIndex, eIndex)
+{
+	var i;
+	var output = "";
+	var max = 0;
+
+	// Generate a unique name for the newly created field with indicators of its type and position.
+	var name = generateName(element, segIndex, eIndex);
+
+	// Begin segment div.
+	output += "<div class='segment'>";
+
+	if (element.type == "inputline") {
+		output += "<input type='text' name='" + name + "'>";
+	}
+	else if (element.type == "multi") {
+		max = element.options.length;
+		for (i = 0; i < max; i++) {
+			output += "<input type='radio' name='" + name + "' value='" + i + "'>" + element.options[i];
+			output += "<br>";
+		}
+		if (element.hasOwnProperty("other") && (element.other == 1)) {
+			// Add a text-input field that auto selects the corresponding radio button automatically upon entering input.
+			output += "<input type='radio' name='" + name + "' value='" + max + "'>" + formJSON.otherText + "<input type='text' name='" + name + "_other' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
+			output += "<br>"; // REMOVE ME
+			max++;
+		}
+	}
+	else if (element.type == "dropdown") {
+		output += "<select name='" + name + "'>";
+		output += "<option name='" + name + "' value='0'>" + formJSON.chooseText + "</option>";
+		max = element.options.length;
+		for (i = 0; i < max; i++) {
+			output += "<option name='" + name + "' value=" + (i + 1) + ">" + element.options[i] + "</option>";
+		}
+		output += "</select>";
+	}
+	else if (element.type == "checkbox") {
+		max = element.options.length;
+		for (i = 0; i < max; i++) {
+			output += "<input type='checkbox' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i] + "</option>";
+		}
+		if (element.hasOwnProperty("other") && (element.other == 1)) {
+			// Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
+			output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "'>" + formJSON.otherText + "<input type='text' name='" + name + "_other' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
+			output += "<br>"; // REMOVE ME
+			max++;
+		}
+	} else throw ("Unsupported element type!");
+
+	// TODO: consider adding a div for "required-field error".
+
+	// End segment div.
+	output += "</div>";
+	
+	// If the field must be filled in by the user then add it to the enforcing list.
+	if ((element.hasOwnProperty("required") && (element.required == 1))) {
+		requiredFields.push([name, max]); // Name of field and maximum options it contains.
+	}
+
+	return output;
+}
+
+function handleElements(seg, segIndex)
+{
+	var i;
+	var output = "";
+	for (i = 0; i < seg.elements.length; i++) {
+		output += "<h3>" + seg.elements[i].text + "</h3>";
+		output += handleElement(seg.elements[i], segIndex, i);
+	}
+	return output;
+}
+
+function handleQuestions(seg, segIndex)
+{
+	// TODO: subQuestions don't support 'required' at the moment.
+	
+	var i;
+	var output = "";
+
+	for (i = 0; i < seg.subQuestions.length; i++) {
+		output += seg.subQuestions[i];
+		output += "<br>"; // REMOVE ME
+		output += "<div class='slider'>";
+		output += seg.slide[3]; // YES.
+		output += "&nbsp;"; // REMOVE ME
+		// "slide":[MIN, MAX, NOTEXT, YESTEXT]
+		var name = generateName({"type":"slider"}, segIndex, i);
+		for (var j = seg.slide[0]; j <= seg.slide[1]; j++) {
+			output += "<input type='radio' name='" + name + "' value='" + (j - seg.slide[0]) + "'>" + j;
+		}
+		output += "&nbsp;"; // REMOVE ME
+		output += seg.slide[2]; // NO.
+		output += "</div>";
+		output += "<br>"; // REMOVE ME
+	}
+	
+	if (seg.hasOwnProperty("comments") && seg.comments == 1) {
+		output += "<h3>" + formJSON.commentsText + "</h3>";
+		var name = generateName({"type":"comments"}, segIndex, 0);
+		output += "<textarea rows=10 cols=80 type='text' name='" + name + "'></textarea>";
+		output += "<br>"; // REMOVE ME
+	}
+
+	return output;
+}
+
+// This function is the engine.
+function showSegment(index)
+{
+	// HTML to output.
+	var output = "";
+	var isNumbered = false;
+	
+	// Reset requiredFields dictionary as we're changing segment.
+	requiredFields = [];
+	
+	seg = formJSON.segments[index];
+	if (seg.hasOwnProperty("title")) {
+		output += "<h1>";
+		if (index > 0) { // Add numbering except opening page.
+			output += index + ")";
+			isNumbered = true;
+		}
+		output += seg.title + "</h1>";
+	}
+	
+	if (seg.hasOwnProperty("text")) {
+		if ((index > 0) && (!isNumbered)) { // Add numbering except opening page.
+			output += "<h2>" + index + ")" + "</h2>";
+		}
+		output += "<p>" + _formatText(seg.text) + "</p>";
+	}
+	
+	if (seg.hasOwnProperty("elements")) {
+		output += handleElements(seg, index);
+	}
+	else if (seg.hasOwnProperty("subQuestions")) {
+		output += handleQuestions(seg, index);
+	}
+	else throw("Bad segment type!");
+
+	output += handleButtons(index);
+	document.getElementById("main").innerHTML = output;
+
+	// Only after the new elements are presented, we can set their state if existing.
+	loadInputState(index);
+}
+
+function confirmReload()
+{
+	return "reload?";
+}
+
+// main function!
+function main()
+{
+	// Take care of RTL direction.
+	if (formJSON.hasOwnProperty("dir")) {
+		document.body.style.direction = formJSON.dir;
+	}
+
+	// Add the artificial submission segment to the end.
+	submissionObj = {};
+	submissionObj["type"] = "segment";
+	submissionObj["text"] = formJSON.submissionText;
+	submissionObj["elements"] = [];
+	formJSON.segments.push(submissionObj);
+
+	// Show first segment.
+	showSegment(0);
+}
+</script>
+</head>
+<body onload="main()" onbeforeunload="return confirmReload()">
+<div id="main">
+</div>
+</body>
+</html>
