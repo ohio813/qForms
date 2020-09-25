@@ -47,162 +47,124 @@ function _formatText(text)
 	return text.replace(/(?:\r\n|\r|\n)/g, '<br>');
 }
 
-function _removeKeysWithPrefix(dict, prefix)
-{
-	toRemove = [];
-	for (var k in dict) {
-		if (k.search(prefix) != -1) {
-			toRemove.push(k);
-		}
-	}
-	while (k = toRemove.pop()) {
-		delete dict[k];
-	}
-}
-
 // GLOBALS:
-// This holds full user's input state.
+// ----------------
+
+// This holds full user's input state, it's a double dictionary.
+// First level is segment-index. Second level is the tag of the input field. Value depends upon type (normally it's the index of the chosen radio/dropdown, or text, etc).
 var formState = {};
-// Holds the array of required fields of the currently displayed elements in the segment (from top to bottom for appropriate UX).
-var requiredFields = []; // Contains list of all required element names and their max number of options (dropdown, multi, etc): (name, max-options) pairs.
+// Holds the array of all fields of the *currently displayed* elements in the segment (from top to bottom for appropriate UX).
+var segmentFields = []; // [field name, segmentIndex, maxOptions, isRequired]
 
-// This function scans all input elements and stores their state.
-function saveInputState()
+// INPUT STATE helper functions
+
+function addState(segIndex, key, value)
 {
-	var i;
-	
-	// Scan all marked check-boxes in the current page.
-	var checkboxes = document.querySelectorAll("input[type=checkbox]");
-	for (i = 0; i < checkboxes.length; i++) {
-		if (checkboxes[i].checked) {
-			// Remember there are multiple options concurrently so make name distinct.
-			formState[checkboxes[i].name] = checkboxes[i].value;
-		}
-		else {
-			// Remove any checks that user might have unselected.
-			delete formState[checkboxes[i].name];
-		}
-	}
+	if (!formState.hasOwnProperty(segIndex)) formState[segIndex] = {};
+	formState[segIndex][key] = value;
+}
 
-	// Scan all selected multi-choices in the current page.
-	var multis = document.querySelectorAll("input[type=radio]:checked");
-	for (i = 0; i < multis.length; i++) {
-		// Remove any base key so we don't have stale ones.
-		_removeKeysWithPrefix(formState, multis[i].name);
-
-		formState[multis[i].name + "_" + multis[i].value] = multis[i].value;
-	}
-
-	// Scan all drop-downs in the current page.
-	var drops = document.querySelectorAll("select");
-	for (i = 0; i < drops.length; i++) {
-		// Remove any base key so we don't have stale ones.
-		_removeKeysWithPrefix(formState, drops[i].name);
-
-		formState[drops[i].name] = drops[i].value;
-	}
-	
-	// Scan all input-fields in the current page.
-	var texts = document.querySelectorAll("input[type=text]");
-	for (i = 0; i < texts.length; i++) {
-		if (texts[i].value.length > 0) {
-			formState[texts[i].name] = texts[i].value;
-		}
-		else {
-			// Remove stale key.
-			delete formState[texts[i].name];
-		}
-	}
-	
-	// Scan all textarea-input-fields in the current page.
-	var texts = document.querySelectorAll("textarea");
-	for (i = 0; i < texts.length; i++) {
-		if (texts[i].value.length > 0) {
-			formState[texts[i].name] = texts[i].value;
-		}
-		else {
-			// Remove stale key.
-			delete formState[texts[i].name];
-		}
+function removeState(segIndex, key)
+{
+	if (formState.hasOwnProperty(segIndex)) {
+		delete formState[segIndex][key];
 	}
 }
 
-// This function scans the state and updates the relevant displayed elements accordingly.
-function loadInputState(index)
+function removeStateBySegment(segIndex)
 {
-	// Technically we're scanning the displayed elements and see if they have a stored state.
-	// Scan all marked check-boxes in the current page.
-	var checkboxes = document.querySelectorAll("input[type=checkbox]");
-	for (i = 0; i < checkboxes.length; i++) {
-		for (var k in formState) {
-			if (k.search(checkboxes[i].name) != -1) {
-				document.getElementsByName(checkboxes[i].name)[0].checked = 1;
-				break;
-			}
-		}
-	}
-	
-	// Scan all selected multi-choices in the current page.
-	var multis = document.querySelectorAll("input[type=radio]");
-	for (i = 0; i < multis.length; i++) {
-		for (var k in formState) {
-			if (k.search(multis[i].name) != -1) {
-				if ((k.search("_other") == -1) || (formState.hasOwnProperty(k + "_other") == true)) {
-					document.getElementsByName(multis[i].name)[formState[k]].checked = 1;
-					break;
-				}
-			}
-		}
-	}
-	
-	// Scan all the drop-downs in the current page.
-	var drops = document.querySelectorAll("select");
-	for (i = 0; i < drops.length; i++) {
-		if (formState.hasOwnProperty(drops[i].name)) {
-			e = document.getElementsByName(drops[i].name)[0];
-			if (e != undefined) {
-				e.selectedIndex = formState[drops[i].name];
-			}
-		}
-	}
-
-	// Restore all input-fields.
-	texts = document.querySelectorAll("input[type=text]");
-	for (i = 0; i < texts.length; i++) {
-		if (formState.hasOwnProperty(texts[i].name)) {
-			e = document.getElementsByName(texts[i].name)[0];
-			if (e != undefined) {
-				e.value = formState[texts[i].name];
-			}
-		}
-	}
-
-	// Restore all textarea-input-fields.
-	texts = document.querySelectorAll("textarea");
-	for (i = 0; i < texts.length; i++) {
-		if (formState.hasOwnProperty(texts[i].name)) {
-			e = document.getElementsByName(texts[i].name)[0];
-			if (e != undefined) {
-				e.value = formState[texts[i].name];
-			}
-		}
-	}
-}
-
-function clearStateBySegment(segIndex)
-{
-	// Remove all possible type of given segment.
-	// See coupled generateName.
-	_removeKeysWithPrefix(formState, "q_checkbox_" + segIndex);
-	_removeKeysWithPrefix(formState, "q_inputline_" + segIndex);
-	_removeKeysWithPrefix(formState, "q_multi_" + segIndex);
-	_removeKeysWithPrefix(formState, "q_dropdown_" + segIndex);
-	_removeKeysWithPrefix(formState, "q_slider_" + segIndex);
+	// Remove all fields in the given segment.
+	delete formState[segIndex];
 }
 
 function generateName(element, segIndex, eIndex)
 {
 	return "q_" + element.type + "_" + segIndex + "_" + eIndex;
+}
+
+function extractName(text)
+{
+	return text.split("_").slice(1); // Break by underscore delimiters and skip tagging letter.
+}
+
+function addField(fieldName, segIndex, maxOptions, isRequired)
+{
+	segmentFields.push([fieldName, segIndex, maxOptions, isRequired]);
+}
+
+function resetFields()
+{
+	segmentFields = [];
+}
+
+// This function stores the status of the relevant HTML controls in the current page.
+function saveInputState(segIndex)
+{
+	var i;
+	for (i = 0; i < segmentFields.length; i++) {
+		var fieldInfo = segmentFields[i];
+		var fieldName = fieldInfo[0];
+		var isRequired = fieldInfo[3];
+		var tagInfo = extractName(fieldName);
+		var type = tagInfo[0];
+		if ((type == "inputline") || (type == "inputmulti")) {
+			var value = document.getElementsByName(fieldName)[0].value;
+			if (value.length > 0) addState(segIndex, fieldName, value);
+			else removeState(segIndex, fieldName);
+		}
+		else if (type == "checkbox") {
+			var checks = document.querySelectorAll("input[name^=" + fieldName + "]:checked");
+			if (checks.length > 0) {
+				var results = [];
+				for (var j = 0; j < checks.length; j++) {
+					results.push(checks[j].value);
+				}
+				addState(segIndex, fieldName, results);
+			}
+			else removeState(segIndex, fieldName);
+		}
+		else if (type == "multi") {
+			var multis = document.querySelectorAll("input[name=" + fieldName + "]:checked");
+			if (multis.length > 0) addState(segIndex, fieldName, multis[0].value);
+			else removeState(segIndex, fieldName);
+		}
+		else if (type == "dropdown") {
+			var value = document.getElementsByName(fieldName)[0].selectedIndex;
+			if (isRequired) {
+				// If it's required and it's the default value don't record it.
+				if (value > 0) addState(segIndex, fieldName, value);
+				// If user changed back to default value, remove state.
+				else removeState(segIndex, fieldName);
+			} else addState(segIndex, fieldName, value);
+		}
+	}
+}
+
+// This function restores the status of the HTML controls from our bookkeeping.
+function loadInputState(segIndex)
+{
+	// We just go over the fields of the given segment, if they exist.
+	if (!formState.hasOwnProperty(segIndex)) return;
+
+	for (var fieldName in formState[segIndex]) {
+		var tagInfo = extractName(fieldName);
+		var type = tagInfo[0];
+		if ((type == "inputline") || (type == "inputmulti")) {
+			document.getElementsByName(fieldName)[0].value = formState[segIndex][fieldName];
+		}
+		else if (type == "checkbox") {
+			var checks = formState[segIndex][fieldName];
+			for (var i = 0; i < checks.length; i++) {
+				document.getElementsByName(fieldName + "_" + checks[i])[0].checked = 1;
+			}
+		}
+		else if (type == "multi") {
+			document.getElementsByName(fieldName)[formState[segIndex][fieldName]].checked = 1;
+		}
+		else if (type == "dropdown") {
+			document.getElementsByName(fieldName)[0].selectedIndex = formState[segIndex][fieldName];
+		}
+	}
 }
 
 function focusOnRequiredField(fieldName)
@@ -222,56 +184,41 @@ function focusOnRequiredField(fieldName)
 // Otherwise lets the user know she needs to fill it in.
 // Stops upon the first input field that isn't filled in.
 // If all's good then true is returned, otherwise false.
-function enforceInput()
+function enforceInput(segIndex)
 {
-	// By default assuming all fields are filled.
-	var okay = true;
-	for (i = 0; i < requiredFields.length; i++) {
-		// Cross check against the formState if there's some input there.
-		var found = false;
-		for (var k in formState) {
-			fieldName = requiredFields[i][0];
-			maxOptions = requiredFields[i][1] - 1;
-			if (k.search(fieldName) != -1) {
-				// If there's any text input, make sure it's not empty (we don't care about white space).
-				if (k.search("inputline") != -1) {
-					if (document.getElementsByName(fieldName)[0].value.length > 0) found = true;
-				}
-				else if (k.search("multi") != -1) {
-					// Examine the currently selected choice.
-					selected = formState[k];
-					// We found an item, so user filled it in, unless it's a text and it's empty.
-					found = true;
-					// See how many options the multi-choice has. If it's the last one, see if there's a text input field.
-					if (selected == maxOptions) {
-						otherField = document.getElementsByName(fieldName + "_other");
-						// Make sure text input field is not empty.
-						if ((otherField.length > 0) && (otherField[0].value.length == 0)) found = false;
-					}
-					break;
-				}
-				else if (k.search("dropdown") != -1) {
-					// Make sure the default (first choice) isn't selected, means user selected something.
-					if (document.getElementsByName(fieldName)[0].selectedIndex > 0) found = true;
-				}
-				else if (k.search("checkbox") != -1) {
-					// As long as there's some checkbox marked, we're good.
-					found = true;
-				}
-				else throw "Uמsupported element type!";
-				break;
+	for (var i = 0; i < segmentFields.length; i++) {
+		var fieldInfo = segmentFields[i];
+		var fieldName = fieldInfo[0];
+		var isRequired = fieldInfo[3];
+		var maxOptions = fieldInfo[2];
+
+		if (!isRequired) continue; // Skip unrequired fields.
+
+		var tagInfo = extractName(fieldName);
+		var type = tagInfo[0];
+		var eIndex = tagInfo[2];
+
+		var found = formState.hasOwnProperty(segIndex) && formState[segIndex].hasOwnProperty(fieldName);
+		if (found) {
+			// For multi-choice we have to make sure the 'other' input is not empty if exists and chosen.
+			if ((type == "multi") && (maxOptions == formState[segIndex][fieldName])) {
+				// Calculate the correct name of the 'other' input text field.
+				var textOtherName = generateName({"type" : "inputline"}, segIndex, eIndex + "_other");
+				// If it exists it means its length is necessarily positive.
+				found = formState[segIndex].hasOwnProperty(textOtherName);
 			}
 		}
+
 		// If we didn't find an input for the required field, we can fail now.
 		if (!found) {
-			console.log("Input is required for " + requiredFields[i]);
-			focusOnRequiredField(requiredFields[i]);
-			okay = false;
-			break;
+			console.log("Input is required for " + fieldName);
+			focusOnRequiredField(fieldName);
+			return false;
 		}
 	}
 
-	return okay;
+	// All fields are good.
+	return true;
 }
 
 function submitForm()
@@ -290,32 +237,35 @@ function submitForm()
 	window.onbeforeunload = null;
 }
 
-function doAction(type, index, direction)
+function doAction(action, index)
 {
-	if (type == "clear") {
-		clearStateBySegment(index);
+	if (action == "clear") {
+		removeStateBySegment(index);
 		showSegment(index);
 		return;
 	}
 
 	// Step 1: Have to record current user's input state.
-	saveInputState();
+	saveInputState(index);
 	
-	// Step 2: Have to check all required fields are filled, else re-focus user and show error.
+	// Step 2:
+	// Have to check all required fields are filled, else re-focus user and show error.
 	// Do it after step 1 as we will be using the currently stored input state.
 	// Always let going backwards, so enforce on forward.
-	if ((direction == 1) && !enforceInput()) {
+	if ((action == "next") && !enforceInput(index)) {
 		// Don't continue if not all fields are filled.
 		return;
 	}
 
 	// Step 3: Do action.
-	if (type == "submit") {
+	if (action == "submit") {
 		submitForm();
 	}
-	else if (type == "move") {
+	else if (action == "next") {
 		// The index is already the correct one whether forward or backward.
-		showSegment(index);
+		showSegment(index + 1);
+	} else if (action == "back") {
+		if (index > 0) showSegment(index - 1);
 	}
 }
 
@@ -323,19 +273,19 @@ function handleButtons(index)
 {
 	// First page has only one button: next.
 	if (index == 0) {
-		return "<button onclick='doAction(\"move\", 1, 1)'>" + formJSON.actionNextText + "</button>";
+		return "<button onclick='doAction(\"next\", 0)'>" + formJSON.actionNextText + "</button>";
 	}
 	
 	// All other pages always have: back.
-	var output = "<button onclick='doAction(\"move\", " + (index - 1) + ", -1)'>" + formJSON.actionBackText + "</button>";
+	var output = "<button onclick='doAction(\"back\", " + index + ")'>" + formJSON.actionBackText + "</button>";
 	
 	// Last page has button: submit.
 	if (index == formJSON.segments.length - 1) {
-		output += "<button onclick='doAction(\"submit\", 0, 0)'>" + formJSON.actionSubmitText + "</button>";
+		output += "<button onclick='doAction(\"submit\", 0)'>" + formJSON.actionSubmitText + "</button>";
 	}
 	else {
 		// Any other page: next.
-		output += "<button onclick='doAction(\"move\", " + (index + 1) + ", 1)'>" + formJSON.actionNextText + "</button>";
+		output += "<button onclick='doAction(\"next\", " + index + ")'>" + formJSON.actionNextText + "</button>";
 	}
 	
 	return output;
@@ -364,12 +314,14 @@ function handleElement(element, segIndex, eIndex)
 		}
 		if (element.hasOwnProperty("other") && (element.other == 1)) {
 			// Add a text-input field that auto selects the corresponding radio button automatically upon entering input.
-			textName = name + "_other";
+			textName = generateName({"type" : "inputline"}, segIndex, eIndex + "_other");
 			// Add feature that focuses & selects the other input field when selecting its radio.
 			output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formJSON.otherText;
 			output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
 			output += "<br>"; // REMOVE ME
-			max++;
+			
+			// Add the new 'other' element to the list.
+			addField(textName, segIndex, 0, 0);
 		}
 	}
 	else if (element.type == "dropdown") {
@@ -388,12 +340,14 @@ function handleElement(element, segIndex, eIndex)
 		}
 		if (element.hasOwnProperty("other") && (element.other == 1)) {
 			// Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
-			textName = name + "_other";
+			textName = generateName({"type" : "inputline"}, segIndex, eIndex + "_other");
 			// Add feature that focuses & selects the other input field when clicking on its check-box.
 			output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); }'>" + formJSON.otherText;
 			output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
 			output += "<br>"; // REMOVE ME
-			max++;
+
+			// Add the new 'other' element to the list.
+			addField(textName, segIndex, 0, 0);
 		}
 	} else throw ("Unsupported element type!");
 
@@ -402,10 +356,10 @@ function handleElement(element, segIndex, eIndex)
 	// End segment div.
 	output += "</div>";
 	
-	// If the field must be filled in by the user then add it to the enforcing list.
-	if ((element.hasOwnProperty("required") && (element.required == 1))) {
-		requiredFields.push([name, max]); // Name of field and maximum options it contains.
-	}
+	// Add the new element to the list.
+	var isRequired = (element.hasOwnProperty("required") && (element.required == 1));
+	if (!isRequired) max = -1; // Ignore max options if it's not a required field.
+	addField(name, segIndex, max, isRequired);
 
 	return output;
 }
@@ -435,27 +389,32 @@ function handleQuestions(seg, segIndex)
 		output += seg.slide[3]; // YES.
 		output += "&nbsp;"; // REMOVE ME
 		// "slide":[MIN, MAX, NOTEXT, YESTEXT]
-		var name = generateName({"type":"slider"}, segIndex, i);
+		max = seg.slide[1];
+		var name = generateName({"type" : "multi"}, segIndex, i);
 		// Feature the fugly hack so double clicking a radio actually deselecting it.
 		var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name +" = this; };'";
-		for (var j = seg.slide[0]; j <= seg.slide[1]; j++) {
+		for (var j = seg.slide[0]; j <= max; j++) {
 			output += "<input type='radio' name='" + name + "' value='" + (j - seg.slide[0]) + "' onclick='" + onclickFunc + "'>" + j;
 		}
 		output += "&nbsp;"; // REMOVE ME
 		output += seg.slide[2]; // NO.
 		output += "</div>";
 		output += "<br>"; // REMOVE ME
+		
+		addField(name, segIndex, max, 0);
 	}
-	
+
 	if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
-		output += "<button onclick='doAction(\"clear\", " + segIndex + ", 0)'>" + formJSON.actionClearText + "</button>";
+		output += "<button onclick='doAction(\"clear\", " + segIndex + ")'>" + formJSON.actionClearText + "</button>";
 	}
-	
+
 	if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
 		output += "<h3>" + formJSON.commentsText + "</h3>";
-		var name = generateName({"type":"comments"}, segIndex, 0);
+		var name = generateName({"type" : "inputmulti"}, segIndex, 0);
 		output += "<textarea rows=10 cols=80 type='text' name='" + name + "'></textarea>";
 		output += "<br>"; // REMOVE ME
+
+		addField(name, segIndex, 0, 0);
 	}
 
 	return output;
@@ -467,10 +426,10 @@ function showSegment(index)
 	// HTML to output.
 	var output = "";
 	var isNumbered = false;
-	
-	// Reset requiredFields dictionary as we're changing segment.
-	requiredFields = [];
-	
+
+	// Reset segmentFields dictionary as we're changing segment.
+	resetFields();
+
 	seg = formJSON.segments[index];
 	if (seg.hasOwnProperty("title")) {
 		output += "<h1>";
