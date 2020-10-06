@@ -213,20 +213,20 @@ function doAction(action, index) {
 }
 
 function handleButtons(index) {
-    // First page has only one button: next.
+    // First page has only one button: start.
     if (index == 0) {
-        return "<button onclick='doAction(\"next\", 0)'>" + formJSON.actionStartText + "</button>";
+        return `<button onclick='doAction("next", 0)'>${formJSON.actionStartText}</button>`;
     }
 
     // All other pages always have: back.
-    var output = "<button onclick='doAction(\"back\", " + index + ")'>" + formJSON.actionBackText + "</button>";
+    var output = `<button onclick='doAction("back", ${index})'>${formJSON.actionBackText}</button>`;
 
     // Last page has button: submit.
     if (index == formJSON.segments.length - 1) {
-        output += "<button onclick='doAction(\"submit\", 0)'>" + formJSON.actionSubmitText + "</button>";
+        output += `<button onclick='doAction("submit", 0)'>${formJSON.actionSubmitText}</button>`;
     } else {
         // Any other page: next.
-        output += "<button onclick='doAction(\"next\", " + index + ")'>" + formJSON.actionNextText + "</button>";
+        output += `<button onclick='doAction("next", ${index})'>${formJSON.actionNextText}</button>`;
     }
 
     return output;
