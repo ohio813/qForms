@@ -348,7 +348,7 @@ function handleQuestions(seg, segIndex) {
     }
 
     if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
-        output += "<button onclick='doAction(\"clear\", " + segIndex + ")'>" + formJSON.actionClearText + "</button>";
+        output += `<button class='btn btn-secondary' onclick='doAction("clear", ${segIndex})'>${formJSON.actionClearText}</button>`;
     }
 
     if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
