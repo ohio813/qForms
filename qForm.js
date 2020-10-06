@@ -215,7 +215,7 @@ function doAction(action, index) {
 function handleButtons(index) {
     // First page has only one button: next.
     if (index == 0) {
-        return "<button onclick='doAction(\"next\", 0)'>" + formJSON.actionNextText + "</button>";
+        return "<button onclick='doAction(\"next\", 0)'>" + formJSON.actionStartText + "</button>";
     }
 
     // All other pages always have: back.
