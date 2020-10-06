@@ -323,12 +323,21 @@ function handleQuestions(seg, segIndex) {
     var i;
     var output = "";
 
+    // Open question group div.
+    output += `
+        <div class='question-group'>
+    `;
+
     for (i = 0; i < seg.subQuestions.length; i++) {
-        output += seg.subQuestions[i];
-        output += "<br>"; // REMOVE ME
-        output += "<div class='slider'>";
-        output += seg.slide[3]; // YES.
-        output += "&nbsp;"; // REMOVE ME
+        // Open question div,
+        // Add question text,
+        // Open slider div.
+        output += `
+            <div class='question'>
+            <p class='question-text'>${seg.subQuestions[i]}</p>
+            <div class='question-slider btn-group btn-group-toggle'>
+        `;
+
         // "slide":[MIN, MAX, NOTEXT, YESTEXT]
         max = seg.slide[1];
         var name = generateName({
@@ -336,16 +345,40 @@ function handleQuestions(seg, segIndex) {
         }, segIndex, i);
         // Feature the fugly hack so double clicking a radio actually deselecting it.
         var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name + " = this; };'";
+        
+        // Add minimum label.
+        output += `
+            <div class='btn btn-secondary disabled'>${seg.slide[3]}</div>
+        `;
+        
+        // Add digits.
         for (var j = seg.slide[0]; j <= max; j++) {
-            output += "<input type='radio' name='" + name + "' value='" + (j - seg.slide[0]) + "' onclick='" + onclickFunc + "'>" + j;
+            output += `
+                <label class="btn btn-secondary">
+                    <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onclickFunc}'>${j}
+                </label>
+            `;
         }
-        output += "&nbsp;"; // REMOVE ME
-        output += seg.slide[2]; // NO.
-        output += "</div>";
-        output += "<br>"; // REMOVE ME
+        
+        // Add maximum label.
+        output += `
+            <div class='btn btn-secondary disabled'>${seg.slide[2]}</div>
+        `;
+
+        // Close slider div,
+        // close question div.
+        output += `
+            </div>
+            </div>
+        `;
 
         addField(name, segIndex, max, 0);
     }
+
+    // Close question group div.
+    output += `
+        </div>
+    `;
 
     if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
         output += `<button class='btn btn-secondary' onclick='doAction("clear", ${segIndex})'>${formJSON.actionClearText}</button>`;
