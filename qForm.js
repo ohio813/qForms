@@ -402,10 +402,6 @@ function showSegment(index) {
     loadInputState(index);
 }
 
-function confirmReload() {
-    return "reload?";
-}
-
 function getFormDataUrl() {
     var dataElements = document.getElementsByTagName("qform-data");
     if (dataElements.length != 1)
@@ -429,6 +425,10 @@ document.addEventListener('DOMContentLoaded', function () {
         submissionObj["text"] = formJSON.submissionText;
         submissionObj["elements"] = [];
         formJSON.segments.push(submissionObj);
+
+        document.body.onbeforeunload = function () {
+            return "reload?";
+        };
 
         showSegment(0);
     };
