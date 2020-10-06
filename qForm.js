@@ -439,8 +439,7 @@ function confirmReload() {
     return "reload?";
 }
 
-// main function!
-function main() {
+document.addEventListener('DOMContentLoaded', function () {
     // Take care of RTL direction.
     if (formJSON.hasOwnProperty("dir")) {
         document.body.style.direction = formJSON.dir;
@@ -455,4 +454,4 @@ function main() {
 
     // Show first segment.
     showSegment(0);
-}
+})
