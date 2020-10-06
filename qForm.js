@@ -1,40 +1,7 @@
 // TODO: add navigation history for next/back buttons???
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
 
-var formJSON = {
-    "postURL":"http://example.com/submit.php",
-"dir":"rtl",
-"actionBackText":"אחורה",
-"actionNextText":"הבא",
-"actionSubmitText":"הגש שאלון",
-"actionClearText":"נקה תשובות",
-"otherText":"אחר:",
-"chooseText":"יש לבחור",
-"commentsText":"הערות:",
-"requiredText":"יש למלא את השדה הזה",
-"submissionText":"סיימת את השאלון! כל הכבוד, האם תרצה להגיש אותו כעת?",
-"actionThanksText":"<h3>תודה שענית על השאלות שלנו!</h3>",
-"segments" : [
-	{
-		"type": "segment",
-		"title": "שאלון לדוגמה",
-		"text": "זהו שאלון לדוגמה",
-		"elements": []
-	},
-	{
-	"type":"questions",
-	"required":1,
-	"slide":[1, 7, "כן", "לא"],
-	"text":``,
-	"subQuestions" : [
-		"האם זו שאלת בדיקה?",
-		"האם גם זו שאלת בדיקה?",
-		"האם השאלות מעלה הן שאלות בדיקה?",
-	]
-	},
-]
-};
-
+var formJSON = {};
 
 // UTILS
 
@@ -439,19 +406,33 @@ function confirmReload() {
     return "reload?";
 }
 
+function getFormDataUrl() {
+    var dataElements = document.getElementsByTagName("qform-data");
+    if (dataElements.length != 1)
+        throw Error("Unexpected number of qform-data elements");
+
+    return dataElements[0].attributes['src'].value;
+}
+
 document.addEventListener('DOMContentLoaded', function () {
-    // Take care of RTL direction.
-    if (formJSON.hasOwnProperty("dir")) {
-        document.body.style.direction = formJSON.dir;
-    }
+    var ajax = new XMLHttpRequest();
 
-    // Add the artificial submission segment to the end.
-    submissionObj = {};
-    submissionObj["type"] = "segment";
-    submissionObj["text"] = formJSON.submissionText;
-    submissionObj["elements"] = [];
-    formJSON.segments.push(submissionObj);
+    ajax.onload = function () {
+        formJSON = JSON.parse(ajax.responseText);
 
-    // Show first segment.
-    showSegment(0);
+        if (formJSON.hasOwnProperty("dir")) {
+            document.body.style.direction = formJSON.dir;
+        }
+
+        submissionObj = {};
+        submissionObj["type"] = "segment";
+        submissionObj["text"] = formJSON.submissionText;
+        submissionObj["elements"] = [];
+        formJSON.segments.push(submissionObj);
+
+        showSegment(0);
+    };
+
+    ajax.open("GET", getFormDataUrl(), true);
+    ajax.send(null);
 })
