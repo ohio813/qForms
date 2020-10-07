@@ -461,30 +461,30 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.style.direction = formMeta.dir;
         }
 
-        if (formMeta.warnReload == 1) {
+        if (formMeta.reloadWarning == 1) {
             document.body.onbeforeunload = function () {
                 return "reload?";
             };
         }
+        
+        // Now load the actual questions data.
+        var ajaxForm = new XMLHttpRequest();
+        ajaxForm.onload = function () {
+            formJSON = JSON.parse(ajaxForm.responseText);
+
+            submissionObj = {};
+            submissionObj["type"] = "segment";
+            submissionObj["text"] = formMeta.submissionText;
+            submissionObj["elements"] = [];
+            formJSON.segments.push(submissionObj);
+
+            // This boots the whole UI!
+            showSegment(0);
+        };
+        var jsonPath = basePath + ".json";
+        ajaxForm.open("GET", jsonPath, true);
+        ajaxForm.send(null);
     };
-    ajax.open("GET", metaPath, true);
+    ajax.open("GET", metaPath);
     ajax.send(null);
-
-    // Load the actual questions data.
-    ajaxForm = new XMLHttpRequest();
-    ajaxForm.onload = function () {
-        formJSON = JSON.parse(ajaxForm.responseText);
-
-        submissionObj = {};
-        submissionObj["type"] = "segment";
-        submissionObj["text"] = formMeta.submissionText;
-        submissionObj["elements"] = [];
-        formJSON.segments.push(submissionObj);
-
-        // This boots the whole UI!
-        showSegment(0);
-    };
-    var jsonPath = basePath + ".json";
-    ajaxForm.open("GET", jsonPath, true);
-    ajaxForm.send(null);
 });

@@ -1,5 +1,6 @@
 {
     "postURL": "http://example.com/submit.php",
+    "reloadWarning":1,
     "dir": "rtl",
     "actionStartText": "בואו נתחיל!",
     "actionBackText": "אחורה",
