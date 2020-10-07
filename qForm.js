@@ -1,7 +1,9 @@
 // TODO: add navigation history for next/back buttons???
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
+// TODO: BUGBUG: clicking on label should select radio or checkbox!
 
-var formJSON = {};
+var formJSON = {}; // This is the form JSON data with all questions.
+var formMeta = {}; // This is the meta data for language and UI.
 
 // UTILS
 
@@ -117,7 +119,7 @@ function focusOnRequiredField(fieldName) {
     // BUGBUG
     ///--------------
     // this should take the user to the required field and tell the user it should be filled in.
-    // e.g. By adding a red mark and a red text saying "this field is required" from formJSON.requiredText.
+    // e.g. By adding a red mark and a red text saying "this field is required" from formMeta.requiredText.
     // Required to insert the sentence below the field's segment.
     // *****MAYBE REQUIRES A NEW DIV for this*******
     // Change segment CSS to 'required'...
@@ -170,14 +172,14 @@ function enforceInput(segIndex) {
 function submitForm() {
     // HTTP POST request with user's input.
     var http = new XMLHttpRequest();
-    http.open("POST", formJSON.postURL, true);
+    http.open("POST", formMeta.postURL, true);
     http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
     var params = "blob=" + JSON.stringify(formState);
     http.send(params);
     //http.onload = function() { alert(http.responseText); }
 
     // Show thank you message.
-    document.getElementById("main").innerHTML = formJSON.actionThanksText;
+    document.getElementById("main").innerHTML = formMeta.actionThanksText;
     // Let the user close page without a warning.
     window.onbeforeunload = null;
 }
@@ -217,17 +219,17 @@ function handleButtons(index) {
 
     // First page has only one button: start.
     if (index == 0) {
-        output += `<button class='btn btn-primary' onclick='doAction("next", 0)'>${formJSON.actionStartText}</button>`;
+        output += `<button class='btn btn-primary' onclick='doAction("next", 0)'>${formMeta.actionStartText}</button>`;
     } else {
         // All other pages always have: back.
-        output += `<button class='btn btn-primary' onclick='doAction("back", ${index})'>${formJSON.actionBackText}</button>`;
+        output += `<button class='btn btn-primary' onclick='doAction("back", ${index})'>${formMeta.actionBackText}</button>`;
 
         // Last page has button: submit.
         if (index == formJSON.segments.length - 1) {
-            output += `<button class='btn btn-primary' onclick='doAction("submit", 0)'>${formJSON.actionSubmitText}</button>`;
+            output += `<button class='btn btn-primary' onclick='doAction("submit", 0)'>${formMeta.actionSubmitText}</button>`;
         } else {
             // Any other page: next.
-            output += `<button class='btn btn-primary' onclick='doAction("next", ${index})'>${formJSON.actionNextText}</button>`;
+            output += `<button class='btn btn-primary' onclick='doAction("next", ${index})'>${formMeta.actionNextText}</button>`;
         }
     }
 
@@ -259,7 +261,7 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
-            output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formJSON.otherText;
+            output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText;
             output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
             output += "<br>"; // REMOVE ME
 
@@ -268,7 +270,7 @@ function handleElement(element, segIndex, eIndex) {
         }
     } else if (element.type == "dropdown") {
         output += "<select name='" + name + "'>";
-        output += "<option name='" + name + "' value='0'>" + formJSON.chooseText + "</option>";
+        output += "<option name='" + name + "' value='0'>" + formMeta.chooseText + "</option>";
         max = element.options.length;
         for (i = 0; i < max; i++) {
             output += "<option name='" + name + "' value=" + (i + 1) + ">" + element.options[i] + "</option>";
@@ -285,7 +287,7 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); }'>" + formJSON.otherText;
+            output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); }'>" + formMeta.otherText;
             output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
             output += "<br>"; // REMOVE ME
 
@@ -381,15 +383,15 @@ function handleQuestions(seg, segIndex) {
     `;
 
     if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
-        output += `<button class='btn btn-secondary' onclick='doAction("clear", ${segIndex})'>${formJSON.actionClearText}</button>`;
+        output += `<button class='btn btn-secondary' onclick='doAction("clear", ${segIndex})'>${formMeta.actionClearText}</button>`;
     }
 
     if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
-        output += "<h3>" + formJSON.commentsText + "</h3>";
+        output += "<h3>" + formMeta.commentsText + "</h3>";
         var name = generateName({
             "type": "inputmulti"
         }, segIndex, 0);
-        output += "<textarea rows=10 cols=80 type='text' name='" + name + "'></textarea>";
+        output += "<textarea rows=10 cols=50% type='text' name='" + name + "'></textarea>";
         output += "<br>"; // REMOVE ME
 
         addField(name, segIndex, 0, 0);
@@ -446,28 +448,43 @@ function getFormDataUrl() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Find user's JSON base path;
+    var basePath = getFormDataUrl();
+
+    // Load the meta data first.
+    var metaPath = basePath + "meta.json";
     var ajax = new XMLHttpRequest();
-
     ajax.onload = function () {
-        formJSON = JSON.parse(ajax.responseText);
+        formMeta = JSON.parse(ajax.responseText);
 
-        if (formJSON.hasOwnProperty("dir")) {
-            document.body.style.direction = formJSON.dir;
+        if (formMeta.hasOwnProperty("dir")) {
+            document.body.style.direction = formMeta.dir;
         }
+
+        if (formMeta.warnReload == 1) {
+            document.body.onbeforeunload = function () {
+                return "reload?";
+            };
+        }
+    };
+    ajax.open("GET", metaPath, true);
+    ajax.send(null);
+
+    // Load the actual questions data.
+    ajaxForm = new XMLHttpRequest();
+    ajaxForm.onload = function () {
+        formJSON = JSON.parse(ajaxForm.responseText);
 
         submissionObj = {};
         submissionObj["type"] = "segment";
-        submissionObj["text"] = formJSON.submissionText;
+        submissionObj["text"] = formMeta.submissionText;
         submissionObj["elements"] = [];
         formJSON.segments.push(submissionObj);
 
-        document.body.onbeforeunload = function () {
-            return "reload?";
-        };
-
+        // This boots the whole UI!
         showSegment(0);
     };
-
-    ajax.open("GET", getFormDataUrl(), true);
-    ajax.send(null);
-})
+    var jsonPath = basePath + ".json";
+    ajaxForm.open("GET", jsonPath, true);
+    ajaxForm.send(null);
+});
