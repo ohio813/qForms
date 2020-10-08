@@ -1,6 +1,7 @@
 // TODO: add navigation history for next/back buttons???
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
 // TODO: BUGBUG: clicking on label should select radio or checkbox!
+// TODO: BUGBUG: update window title upon loading.
 
 var formJSON = {}; // This is the form JSON data with all questions.
 var formMeta = {}; // This is the meta data for language and UI.
@@ -54,15 +55,32 @@ function resetFields() {
     segmentFields = [];
 }
 
-// This function stores the status of the relevant HTML controls in the current page.
-function saveInputState(segIndex) {
+// This function is called every time a field has new input.
+function saveControlState(control) {
+    // Save the state of the new input for this control.
+    // It is required to track it live in case the user hits the broswer's builtin 'forward' or 'back'
+    // navigation buttons bypassing our own buttons, so we need to save state every time.
+    saveInputState(control.name);
+}
+
+// This function stores the status of the relevant HTML control(s) in the current page.
+function saveInputState(fieldName) {
     var i;
+    // Lookup the field in our records.
     for (i = 0; i < segmentFields.length; i++) {
         var fieldInfo = segmentFields[i];
-        var fieldName = fieldInfo[0];
+        var curFieldName = fieldInfo[0];
         var isRequired = fieldInfo[3];
         var tagInfo = extractName(fieldName);
         var type = tagInfo[0];
+        var segIndex = fieldInfo[1];
+
+        // Skip this field if it doesn't match.
+        if (curFieldName != fieldName) {
+            if (!((fieldName.search("checkbox") != -1) && (fieldName.search(curFieldName) != -1))) continue;
+            fieldName = curFieldName;
+        }
+
         if ((type == "inputline") || (type == "inputmulti")) {
             var value = document.getElementsByName(fieldName)[0].value;
             if (value.length > 0) addState(segIndex, fieldName, value);
@@ -117,7 +135,7 @@ function loadInputState(segIndex) {
 
 function focusOnRequiredField(fieldName) {
     // BUGBUG
-    ///--------------
+    // --------------
     // this should take the user to the required field and tell the user it should be filled in.
     // e.g. By adding a red mark and a red text saying "this field is required" from formMeta.requiredText.
     // Required to insert the sentence below the field's segment.
@@ -159,7 +177,7 @@ function enforceInput(segIndex) {
 
         // If we didn't find an input for the required field, we can fail now.
         if (!found) {
-            console.log("Input is required for " + fieldName);
+            console.log("Input is required for " + fieldName); // TODO: REMOVE ME
             focusOnRequiredField(fieldName);
             return false;
         }
@@ -184,6 +202,29 @@ function submitForm() {
     window.onbeforeunload = null;
 }
 
+// Add an entry to the history of navigation.
+function updateHistory(index, shouldReplace) {
+    if (window.history) {
+        var context = {"index":index, "formJSON":formJSON};
+        if (shouldReplace) {
+            history.replaceState(context, document.title, `?id=${index}`);
+        }
+        else {
+            history.pushState(context, document.title, `?id=${index}`);
+        }
+        return true;
+    }
+    return false;
+}
+
+// popStateEvent callback.
+function loadFromHistory(event) {
+    if (event != null) {
+        formJSON = event.state.formJSON;
+        showSegment(event.state.index);
+    }
+}
+
 function doAction(action, index) {
     if (action == "clear") {
         removeStateBySegment(index);
@@ -192,7 +233,7 @@ function doAction(action, index) {
     }
 
     // Step 1: Have to record current user's input state.
-    saveInputState(index);
+    // saveInputState(index);
 
     // Step 2:
     // Have to check all required fields are filled, else re-focus user and show error.
@@ -207,10 +248,19 @@ function doAction(action, index) {
     if (action == "submit") {
         submitForm();
     } else if (action == "next") {
-        // The index is already the correct one whether forward or backward.
+        // Add history state.
+        updateHistory(index + 1, false);
+        // Now show new segment.
         showSegment(index + 1);
     } else if (action == "back") {
-        if (index > 0) showSegment(index - 1);
+
+        if (updateHistory(index, true)) {
+            // Add history state.
+            history.go(-1);
+        }
+        else {
+            showSegment(index - 1);
+        }
     }
 }
 
@@ -219,7 +269,7 @@ function handleButtons(index) {
 
     // First page has only one button: start.
     if (index == 0) {
-        output += `<button class='btn btn-primary' onclick='doAction("next", 0)'>${formMeta.actionStartText}</button>`;
+        output += `<button class='btn btn-primary' onclick='doAction("next", 0);'>${formMeta.actionStartText}</button>`;
     } else {
         // All other pages always have: back.
         output += `<button class='btn btn-primary' onclick='doAction("back", ${index})'>${formMeta.actionBackText}</button>`;
@@ -252,7 +302,7 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "multi") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<input type='radio' name='" + name + "' value='" + i + "'>" + element.options[i];
+            output += "<input type='radio' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i];
             output += "<br>";
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
@@ -261,16 +311,16 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
-            output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText;
-            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;'>";
+            output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='saveControlState(this);document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText;
+            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;saveControlState(this);'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
             addField(textName, segIndex, 0, 0);
         }
     } else if (element.type == "dropdown") {
-        output += "<select name='" + name + "'>";
-        output += "<option name='" + name + "' value='0'>" + formMeta.chooseText + "</option>";
+        output += "<select onchange='saveControlState(this)' name='" + name + "'>";
+        output += "<option name='" + name + "' value='0' >" + formMeta.chooseText + "</option>";
         max = element.options.length;
         for (i = 0; i < max; i++) {
             output += "<option name='" + name + "' value=" + (i + 1) + ">" + element.options[i] + "</option>";
@@ -279,7 +329,7 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "checkbox") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<input type='checkbox' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i] + "</option>";
+            output += "<input type='checkbox' onclick='saveControlState(this)' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i];
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
@@ -287,8 +337,8 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); }'>" + formMeta.otherText;
-            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;'>";
+            output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); } saveControlState(this);'>" + formMeta.otherText;
+            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;saveControlState(this);'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -346,7 +396,7 @@ function handleQuestions(seg, segIndex) {
             "type": "multi"
         }, segIndex, i);
         // Feature the fugly hack so double clicking a radio actually deselecting it.
-        var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name + " = this; };'";
+        var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name + " = this; }; saveControlState(this);'";
         
         // Add minimum label.
         output += `
@@ -391,7 +441,7 @@ function handleQuestions(seg, segIndex) {
         var name = generateName({
             "type": "inputmulti"
         }, segIndex, 0);
-        output += "<textarea rows=10 cols=50% type='text' name='" + name + "'></textarea>";
+        output += "<textarea rows=10 cols=50% type='text' name='" + name + "' oninput='saveControlState(this)'></textarea>";
         output += "<br>"; // REMOVE ME
 
         addField(name, segIndex, 0, 0);
@@ -406,7 +456,7 @@ function showSegment(index) {
     var output = "";
     var isNumbered = false;
 
-    // Reset segmentFields dictionary as we're changing segment.
+    // Reset segmentFields list as we're changing segment.
     resetFields();
 
     seg = formJSON.segments[index];
@@ -463,10 +513,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (formMeta.reloadWarning == 1) {
             document.body.onbeforeunload = function () {
-                return "reload?";
+                return "Are you sure you want to reload and lose information?";
             };
         }
         
+        // Support history navigation.
+        window.addEventListener('popstate', loadFromHistory);
+
         // Now load the actual questions data.
         var ajaxForm = new XMLHttpRequest();
         ajaxForm.onload = function () {
@@ -477,6 +530,9 @@ document.addEventListener('DOMContentLoaded', function () {
             submissionObj["text"] = formMeta.submissionText;
             submissionObj["elements"] = [];
             formJSON.segments.push(submissionObj);
+
+            // Initialize our history here on first visit.
+            updateHistory(0, true);
 
             // This boots the whole UI!
             showSegment(0);
