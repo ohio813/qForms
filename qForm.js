@@ -1,4 +1,3 @@
-// TODO: add navigation history for next/back buttons???
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
 // TODO: BUGBUG: clicking on label should select radio or checkbox!
 // TODO: BUGBUG: update window title upon loading.
@@ -20,6 +19,10 @@ function _formatText(text) {
 var formState = {};
 // Holds the array of all fields of the *currently displayed* elements in the segment (from top to bottom for appropriate UX).
 var segmentFields = []; // [field name, segmentIndex, maxOptions, isRequired]
+
+// A helper bookkeeping segment index to keep browser navigation in sync
+// with our own 'back' and 'next' buttons.
+var lastVisitedSegment = 0;
 
 // INPUT STATE helper functions
 
@@ -205,7 +208,7 @@ function submitForm() {
 // Add an entry to the history of navigation.
 function updateHistory(index, shouldReplace) {
     if (window.history) {
-        var context = {"index":index, "formJSON":formJSON};
+        var context = {"index":index};
         if (shouldReplace) {
             history.replaceState(context, document.title, `?id=${index}`);
         }
@@ -220,7 +223,7 @@ function updateHistory(index, shouldReplace) {
 // popStateEvent callback.
 function loadFromHistory(event) {
     if (event != null) {
-        formJSON = event.state.formJSON;
+        //formState = event.state.formState;
         showSegment(event.state.index);
     }
 }
@@ -248,19 +251,26 @@ function doAction(action, index) {
     if (action == "submit") {
         submitForm();
     } else if (action == "next") {
-        // Add history state.
-        updateHistory(index + 1, false);
-        // Now show new segment.
-        showSegment(index + 1);
-    } else if (action == "back") {
-
-        if (updateHistory(index, true)) {
+        
+        // Keep track of our own last visited segment.
+        // This is important to keep the browser's own 'back' and 'forward' buttons in sync with ours.
+        // If we've never been to the next segment, then add it to history and show it.
+        if (index + 1 > lastVisitedSegment) {
+            lastVisitedSegment = index + 1;
+            
             // Add history state.
-            history.go(-1);
+            updateHistory(index + 1, false);
+            // Now show new segment.
+            showSegment(index + 1);
+        } else {
+            // In case we have visited this segment in the past, use the history to go there.
+            history.go(1);
         }
-        else {
-            showSegment(index - 1);
-        }
+    } else if (action == "back") {
+        // We can always go backwards.
+        history.go(-1);
+        // In case backwards didn't work for some reason, show the segment anyway.
+        showSegment(index - 1);
     }
 }
 
