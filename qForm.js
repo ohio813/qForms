@@ -1,5 +1,4 @@
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
-// TODO: BUGBUG: clicking on label should select radio or checkbox!
 // TODO: BUGBUG: update window title upon loading.
 
 var formJSON = {}; // This is the form JSON data with all questions.
@@ -312,7 +311,7 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "multi") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<input type='radio' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i];
+            output += "<label><input type='radio' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
             output += "<br>";
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
@@ -321,7 +320,7 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
-            output += "<input type='radio' name='" + name + "' value='" + max + "' onclick='saveControlState(this);document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText;
+            output += "<label><input type='radio' name='" + name + "' value='" + max + "' onclick='saveControlState(this);document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText + "</label>";
             output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;saveControlState(this);'>";
             output += "<br>"; // REMOVE ME
 
@@ -339,7 +338,7 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "checkbox") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<input type='checkbox' onclick='saveControlState(this)' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i];
+            output += "<label><input type='checkbox' onclick='saveControlState(this)' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i] + "</label>";
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
@@ -347,7 +346,7 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); } saveControlState(this);'>" + formMeta.otherText;
+            output += "<label><input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); } saveControlState(this);'>" + formMeta.otherText + "</label>";
             output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;saveControlState(this);'>";
             output += "<br>"; // REMOVE ME
 
