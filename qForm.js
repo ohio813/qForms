@@ -1,5 +1,4 @@
 // TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
-// TODO: BUGBUG: update window title upon loading.
 
 var formJSON = {}; // This is the form JSON data with all questions.
 var formMeta = {}; // This is the meta data for language and UI.
@@ -209,10 +208,13 @@ function updateHistory(index, shouldReplace) {
     if (window.history) {
         var context = {"index":index};
         if (shouldReplace) {
-            history.replaceState(context, document.title, `?id=${index}`);
+            history.replaceState(context, "", `?id=${index}`);
+            document.title = getSegmentTitle(index);
         }
         else {
-            history.pushState(context, document.title, `?id=${index}`);
+            history.pushState(context, "", `?id=${index}`);
+            document.title = getSegmentTitle(index);
+            
         }
         return true;
     }
@@ -222,7 +224,6 @@ function updateHistory(index, shouldReplace) {
 // popStateEvent callback.
 function loadFromHistory(event) {
     if (event != null) {
-        //formState = event.state.formState;
         showSegment(event.state.index);
     }
 }
@@ -234,10 +235,6 @@ function doAction(action, index) {
         return;
     }
 
-    // Step 1: Have to record current user's input state.
-    // saveInputState(index);
-
-    // Step 2:
     // Have to check all required fields are filled, else re-focus user and show error.
     // Do it after step 1 as we will be using the currently stored input state.
     // Always let going backwards, so enforce on forward.
@@ -246,7 +243,6 @@ function doAction(action, index) {
         return;
     }
 
-    // Step 3: Do action.
     if (action == "submit") {
         submitForm();
     } else if (action == "next") {
@@ -295,6 +291,35 @@ function handleButtons(index) {
     return output + `</div>`;
 }
 
+// This is an onclick handler for the label "other" choice in multi or checkbox fields.
+function onOtherLabelClicked(self, pairedElementName) {
+    // Only when checking-on the label then transfer focus to corresponding input field.
+    // And only in case it has the focus, otherwise we came from another text field and no need to re-select text.
+    if (self.checked && (document.activeElement == self)) {
+        document.getElementsByName(pairedElementName)[0].focus();
+        document.getElementsByName(pairedElementName)[0].select();
+    }
+    
+    // Save state for self control element.
+    saveControlState(self);
+}
+
+// This is the onclick handler for the "other" input text field.
+function onOtherInputClicked(self, pairedElement) {
+    if (typeof pairedElement == "string") {
+        pairedElement = document.getElementsByName(pairedElement)[0];
+    }
+
+    // Only if the checkbox or radio isn't checked then simulate a click
+    // (so the relevant handler is called too).
+    if (!pairedElement.checked) {
+        pairedElement.click();
+    }
+
+    // Save state for self control element.
+    saveControlState(self);
+}
+
 function handleElement(element, segIndex, eIndex) {
     var i;
     var output = "";
@@ -320,8 +345,8 @@ function handleElement(element, segIndex, eIndex) {
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
-            output += "<label><input type='radio' name='" + name + "' value='" + max + "' onclick='saveControlState(this);document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select();'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "\")[" + max + "].checked=true;saveControlState(this);'>";
+            output += "<label><input type='radio' name='" + name + "' value='" + max + "' onchange='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
+            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -345,9 +370,10 @@ function handleElement(element, segIndex, eIndex) {
             textName = generateName({
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
+            var maxName =  name + "_" + max;
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<label><input type='checkbox' name='" + name + "_" + max + "' value='" + max + "' onclick='if (this.checked) { document.getElementsByName(\"" + textName + "\")[0].focus();document.getElementsByName(\"" + textName + "\")[0].select(); } saveControlState(this);'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' name='" + textName + "' oninput='document.getElementsByName(\"" + name + "_" + max + "\")[0].checked=true;saveControlState(this);'>";
+            output += "<label><input type='checkbox' name='" + maxName + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
+            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, \"" + maxName + "\")'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -459,6 +485,31 @@ function handleQuestions(seg, segIndex) {
     return output;
 }
 
+// Returns the correct displayable question # by skipping elements that aren't "questions" type.
+function getQuestionNum(index) {
+    var i;
+    var count = 1;
+    for (i = 0; i < index; i++) {
+        if (formJSON.segments[i].type == "questions") count++;
+    }
+    return count;
+}
+
+// Find the correct title for the given segment.
+function getSegmentTitle(index) {
+    var seg = formJSON.segments[index];
+    if (seg.type == "segment") {
+        if (seg.hasOwnProperty("title")) {
+            return seg.title;
+        }
+    } else if (seg.type == "questions") {
+        return formMeta.questionText + " " + getQuestionNum(index);
+    }
+
+    // Shouldn't reach here.
+    return "";
+}
+
 // This function is the engine.
 function showSegment(index) {
     // HTML to output.
@@ -468,7 +519,7 @@ function showSegment(index) {
     // Reset segmentFields list as we're changing segment.
     resetFields();
 
-    seg = formJSON.segments[index];
+    var seg = formJSON.segments[index];
     if (seg.hasOwnProperty("title")) {
         output += "<h1>";
         if (index > 0) { // Add numbering except opening page.
