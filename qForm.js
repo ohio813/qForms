@@ -35,11 +35,6 @@ function removeState(segIndex, key) {
     }
 }
 
-function removeStateBySegment(segIndex) {
-    // Remove all fields in the given segment.
-    delete formState[segIndex];
-}
-
 function generateName(element, segIndex, eIndex) {
     return "q_" + element.type + "_" + segIndex + "_" + eIndex;
 }
@@ -242,12 +237,6 @@ function loadFromHistory(event) {
 }
 
 function doAction(action, index) {
-    if (action == "clear") {
-        removeStateBySegment(index);
-        showSegment(index);
-        return;
-    }
-
     // Have to check all required fields are filled, else re-focus user and show error.
     // Do it after step 1 as we will be using the currently stored input state.
     // Always let going backwards, so enforce on forward.
@@ -495,10 +484,6 @@ function handleQuestions(seg, segIndex) {
     output += `
         </div>
     `;
-
-    if (seg.hasOwnProperty("clear") && (seg.clear == 1)) {
-        output += `<button class='btn btn-secondary' onclick='doAction("clear", ${segIndex})'>${formMeta.actionClearText}</button>`;
-    }
 
     if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
         output += "<h3>" + formMeta.commentsText + "</h3>";
