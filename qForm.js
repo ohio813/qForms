@@ -1,5 +1,3 @@
-// TODO: ADD support for CSS, textarea rows/cols by CSS, finish focusOnRequiredField to show error
-
 var formJSON = {}; // This is the form JSON data with all questions.
 var formMeta = {}; // This is the meta data for language and UI.
 
@@ -7,6 +5,22 @@ var formMeta = {}; // This is the meta data for language and UI.
 
 function _formatText(text) {
     return text.replace(/(?:\r\n|\r|\n)/g, '<br>');
+}
+
+// Scan up the ancestors to find next DIV element.
+function _findDivAncestor(element) {
+    if (typeof element == "string") {
+        var elements = document.getElementsByName(element);
+        if (elements.length > 0) {
+            element = elements[0];
+        }
+    }
+    var parent = element.parentNode;
+    for (i = 0; (i < 3) && (parent != null); i++) {
+        if (parent.tagName == "DIV") break;
+        parent = parent.parentElement;
+    }
+    return parent;
 }
 
 // GLOBALS:
@@ -27,6 +41,7 @@ var lastVisitedSegment = 0;
 function addState(segIndex, key, value) {
     if (!formState.hasOwnProperty(segIndex)) formState[segIndex] = {};
     formState[segIndex][key] = value;
+    return true;
 }
 
 function removeState(segIndex, key) {
@@ -56,7 +71,10 @@ function saveControlState(control) {
     // Save the state of the new input for this control.
     // It is required to track it live in case the user hits the broswer's builtin 'forward' or 'back'
     // navigation buttons bypassing our own buttons, so we need to save state every time.
-    saveInputState(control.name);
+    var isSaved = saveInputState(control.name);
+
+    // If the field exists now, then it's not required anymore.
+    if (isSaved) removeRequiredField(control.name);
 }
 
 // This function stores the status of the relevant HTML control(s) in the current page.
@@ -79,7 +97,7 @@ function saveInputState(fieldName) {
 
         if ((type == "inputline") || (type == "inputmulti")) {
             var value = document.getElementsByName(fieldName)[0].value;
-            if (value.length > 0) addState(segIndex, fieldName, value);
+            if (value.length > 0) return addState(segIndex, fieldName, value);
             else removeState(segIndex, fieldName);
         } else if (type == "checkbox") {
             var checks = document.querySelectorAll("input[name^=" + fieldName + "]:checked");
@@ -88,22 +106,24 @@ function saveInputState(fieldName) {
                 for (var j = 0; j < checks.length; j++) {
                     results.push(checks[j].value);
                 }
-                addState(segIndex, fieldName, results);
+                return addState(segIndex, fieldName, results);
             } else removeState(segIndex, fieldName);
         } else if (type == "multi") {
             var multis = document.querySelectorAll("input[name=" + fieldName + "]:checked");
-            if (multis.length > 0) addState(segIndex, fieldName, multis[0].value);
+            if (multis.length > 0) return addState(segIndex, fieldName, multis[0].value);
             else removeState(segIndex, fieldName);
         } else if (type == "dropdown") {
             var value = document.getElementsByName(fieldName)[0].selectedIndex;
             if (isRequired) {
                 // If it's required and it's the default value don't record it.
-                if (value > 0) addState(segIndex, fieldName, value);
+                if (value > 0) return addState(segIndex, fieldName, value);
                 // If user changed back to default value, remove state.
                 else removeState(segIndex, fieldName);
-            } else addState(segIndex, fieldName, value);
+            } else return addState(segIndex, fieldName, value);
         }
     }
+    
+    return false;
 }
 
 function updateSliderLabelStyle(label) {
@@ -151,15 +171,21 @@ function loadInputState(segIndex) {
     }
 }
 
-function focusOnRequiredField(fieldName) {
-    // BUGBUG
-    // --------------
-    // this should take the user to the required field and tell the user it should be filled in.
-    // e.g. By adding a red mark and a red text saying "this field is required" from formMeta.requiredText.
-    // Required to insert the sentence below the field's segment.
-    // *****MAYBE REQUIRES A NEW DIV for this*******
-    // Change segment CSS to 'required'...
+function removeRequiredField(self) {
+    // Remove question's CSS 'required'.
+    var parent = _findDivAncestor(self);
+    if (parent != null) {
+        parent.classList.remove("required");
+    }
+}
 
+function focusOnRequiredField(fieldName) {   
+    // Change question's CSS to 'required'...
+    var parent = _findDivAncestor(fieldName);
+    if (parent != null) {
+        // Add the 'required' class to the div element.
+        parent.classList.add("required");
+    }
     return;
 }
 
@@ -406,7 +432,7 @@ function handleElements(seg, segIndex) {
     var output = "";
     for (i = 0; i < seg.elements.length; i++) {
         // Begin segment div.
-        output += "<div class='segment'>";
+        output += "<div class='question'>";
 
         output += "<h3>" + seg.elements[i].text + "</h3>";
         output += handleElement(seg.elements[i], segIndex, i);

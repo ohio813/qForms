@@ -9,15 +9,6 @@
     margin-bottom: 2.5%;
 }
 
-.segment {
-    border-radius: 5px;
-    background: #1890ff10;
-    border: 1px solid #1890ff;
-    margin-bottom: 20px;
-    margin-top: 20px;
-    padding: 5px;
-}
-
 .bottom-buttons {
     margin-top: 20px;
 }
@@ -28,7 +19,17 @@
 }
 
 .question {
+    border-radius: 5px;
+    background: #1890ff10;
+    border: 1px solid #1890ff;
     margin-bottom: 20px;
+    margin-top: 20px;
+    padding: 5px;
+    margin-bottom: 20px;
+}
+
+.question.required {
+    border: 1px solid red;
 }
 
 .question-group {
