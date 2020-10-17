@@ -424,6 +424,13 @@ function onSliderInputClicked(input) {
     saveControlState(input);
 }
 
+function onCommentsInput(comments) {
+    comments.style.height = 'auto';
+    comments.style.height = (comments.scrollHeight) + 'px';
+
+    saveControlState(comments);
+}
+
 function handleQuestions(seg, segIndex) {
     // TODO: subQuestions don't support 'required' at the moment.
 
@@ -489,13 +496,18 @@ function handleQuestions(seg, segIndex) {
         </div>
     `;
 
-    if (seg.hasOwnProperty("comments") && (seg.comments == 1)) {
-        output += "<h3>" + formMeta.commentsText + "</h3>";
+    if (seg.comments) {
         var name = generateName({
             "type": "inputmulti"
         }, segIndex, 0);
-        output += "<textarea rows=10 cols=50% type='text' name='" + name + "' oninput='saveControlState(this)'></textarea>";
-        output += "<br>"; // REMOVE ME
+
+        output += `
+            <textarea class='textarea-autosize'
+                      rows=1
+                      name='${name}'
+                      oninput='${onCommentsInput.name}(this)'
+                      placeholder='${formMeta.commentsText}'></textarea>
+        `;
 
         addField(name, segIndex, 0, 0);
     }

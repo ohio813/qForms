@@ -24,3 +24,20 @@
     margin-top: 2.5%;
     margin-bottom: 2.5%;
 }
+
+.textarea-autosize {
+    margin: 1rem 0;
+    width: 100%;
+    resize: none;
+    overflow-y:hidden;
+    outline: 0;
+    border: none;
+    border-bottom: 1px solid black;
+}
+
+.textarea-autosize:focus {
+    background-color: #1890ff10;
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+    border-bottom-color: #1890ff;
+}
