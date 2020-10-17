@@ -330,11 +330,10 @@ function handleElement(element, segIndex, eIndex) {
     // Generate a unique name for the newly created field with indicators of its type and position.
     var name = generateName(element, segIndex, eIndex);
 
-    // Begin segment div.
-    output += "<div class='segment'>";
-
-    if (element.type == "inputline") {
-        output += "<input type='text' name='" + name + "'>";
+    if (element.type == "inputmultiline") {
+        output += "<textarea rows=10 cols=50% name='" + name + "' oninput='saveControlState(this)'></textarea>";
+    } else if (element.type == "inputline") {
+        output += "<input type='text' oninput='saveControlState(this)' name='" + name + "'>";
     } else if (element.type == "multi") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
@@ -385,9 +384,6 @@ function handleElement(element, segIndex, eIndex) {
 
     // TODO: consider adding a div for "required-field error".
 
-    // End segment div.
-    output += "</div>";
-
     // Add the new element to the list.
     var isRequired = (element.hasOwnProperty("required") && (element.required == 1));
     if (!isRequired) max = -1; // Ignore max options if it's not a required field.
@@ -400,8 +396,14 @@ function handleElements(seg, segIndex) {
     var i;
     var output = "";
     for (i = 0; i < seg.elements.length; i++) {
+        // Begin segment div.
+        output += "<div class='segment'>";
+
         output += "<h3>" + seg.elements[i].text + "</h3>";
         output += handleElement(seg.elements[i], segIndex, i);
+
+        // End segment div.
+        output += "</div>";
     }
     return output;
 }

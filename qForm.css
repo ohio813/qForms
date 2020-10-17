@@ -1,6 +1,21 @@
+@media only screen and (min-width: 800px) {
+  #main {
+    width:50%;
+  }
+}
+
 #main {
     margin-top: 2.5%;
     margin-bottom: 2.5%;
+}
+
+.segment {
+    border-radius: 5px;
+    background: #1890ff10;
+    border: 1px solid #1890ff;
+    margin-bottom: 20px;
+    margin-top: 20px;
+    padding: 5px;
 }
 
 .bottom-buttons {
