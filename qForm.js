@@ -111,6 +111,17 @@ function saveInputState(fieldName) {
     }
 }
 
+function updateSliderLabelStyle(label) {
+    if (label.firstElementChild.checked)
+        label.classList.add("active");
+    else
+        label.classList.remove("active");
+}
+
+function isSliderLabelActive(label) {
+    return label.classList.contains("active")
+}
+
 // This function restores the status of the HTML controls from our bookkeeping.
 function loadInputState(segIndex) {
     // We just go over the fields of the given segment, if they exist.
@@ -127,7 +138,9 @@ function loadInputState(segIndex) {
                 document.getElementsByName(fieldName + "_" + checks[i])[0].checked = 1;
             }
         } else if (type == "multi") {
-            document.getElementsByName(fieldName)[formState[segIndex][fieldName]].checked = 1;
+            var element = document.getElementsByName(fieldName)[formState[segIndex][fieldName]];
+            element.checked = 1;
+            updateSliderLabelStyle(element.parentNode);
         } else if (type == "dropdown") {
             document.getElementsByName(fieldName)[0].selectedIndex = formState[segIndex][fieldName];
         }
@@ -404,6 +417,24 @@ function handleElements(seg, segIndex) {
     return output;
 }
 
+
+function onSliderInputClicked(input) {
+    label = input.parentNode;
+    input.checked = !isSliderLabelActive(label);
+    updateSliderLabelStyle(label);
+
+    for (var other of label.parentNode.children) {
+        if (other === label ||
+            !other.firstElementChild)
+            continue;
+
+        other.firstElementChild.checked = false;
+        updateSliderLabelStyle(other);
+    };
+
+    saveControlState(input);
+}
+
 function handleQuestions(seg, segIndex) {
     // TODO: subQuestions don't support 'required' at the moment.
 
@@ -430,8 +461,6 @@ function handleQuestions(seg, segIndex) {
         var name = generateName({
             "type": "multi"
         }, segIndex, i);
-        // Feature the fugly hack so double clicking a radio actually deselecting it.
-        var onclickFunc = "try { g_" + name + "; } catch (error) { g_" + name + "=null; } if (this == g_" + name + ") { this.checked=0; g_" + name + " = null; } else { g_" + name + " = this; }; saveControlState(this);'";
         
         // Add minimum label.
         output += `
@@ -442,7 +471,7 @@ function handleQuestions(seg, segIndex) {
         for (var j = seg.slide[0]; j <= max; j++) {
             output += `
                 <label class="btn btn-secondary">
-                    <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onclickFunc}'>${j}
+                    <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onSliderInputClicked.name}(this)'>${j}
                 </label>
             `;
         }
