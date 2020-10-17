@@ -438,10 +438,12 @@ function handleQuestions(seg, segIndex) {
     for (i = 0; i < seg.subQuestions.length; i++) {
         // Open question div,
         // Add question text,
+        // Open centering div.
         // Open slider div.
         output += `
             <div class='question'>
             <p class='question-text'>${seg.subQuestions[i]}</p>
+            <div class='text-center'>
             <div class='question-slider btn-group btn-group-toggle'>
         `;
 
@@ -471,8 +473,10 @@ function handleQuestions(seg, segIndex) {
         `;
 
         // Close slider div,
+        // Close centering div.
         // close question div.
         output += `
+            </div>
             </div>
             </div>
         `;
