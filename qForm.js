@@ -528,25 +528,36 @@ function getSegmentTitle(index) {
 function showSegment(index) {
     // HTML to output.
     var output = "";
-    var isNumbered = false;
 
     // Reset segmentFields list as we're changing segment.
     resetFields();
 
     var seg = formJSON.segments[index];
+
+    // Add progress bar for non-title pages.
+    if (index > 0) {
+        var total_segments = formJSON.segments.length;
+        var progress = Math.round(index / total_segments * 100);
+    
+        output += `
+            <div class="progress">
+            <div class="progress-bar"
+                 role="progressbar"
+                 style="width: ${progress}%"
+                 aria-valuenow="${index}"
+                 aria-valuemin="1"
+                 aria-valuemax="${total_segments}">${index}/${total_segments}</div>
+            </div>
+        `;
+    }
+
     if (seg.hasOwnProperty("title")) {
-        output += "<h1>";
-        if (index > 0) { // Add numbering except opening page.
-            output += index + ")";
-            isNumbered = true;
-        }
-        output += seg.title + "</h1>";
+        output += `
+            <h1>${seg.title}</h1>
+        `;
     }
 
     if (seg.hasOwnProperty("text")) {
-        if ((index > 0) && (!isNumbered)) { // Add numbering except opening page.
-            output += "<h2>" + index + ")" + "</h2>";
-        }
         output += "<p>" + _formatText(seg.text) + "</p>";
     }
 
