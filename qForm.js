@@ -117,6 +117,11 @@ function isSliderLabelActive(label) {
     return label.classList.contains("active")
 }
 
+function autosizeTextArea(textArea) {
+    textArea.style.height = 'auto';
+    textArea.style.height = (textArea.scrollHeight) + 'px';
+}
+
 // This function restores the status of the HTML controls from our bookkeeping.
 function loadInputState(segIndex) {
     // We just go over the fields of the given segment, if they exist.
@@ -125,8 +130,12 @@ function loadInputState(segIndex) {
     for (var fieldName in formState[segIndex]) {
         var tagInfo = extractName(fieldName);
         var type = tagInfo[0];
-        if ((type == "inputline") || (type == "inputmulti")) {
+        if (type == "inputline") {
             document.getElementsByName(fieldName)[0].value = formState[segIndex][fieldName];
+        } else if (type == "inputmultiline") {
+            var element = document.getElementsByName(fieldName)[0];
+            element.value = formState[segIndex][fieldName];
+            autosizeTextArea(element);
         } else if (type == "checkbox") {
             var checks = formState[segIndex][fieldName];
             for (var i = 0; i < checks.length; i++) {
@@ -427,9 +436,7 @@ function onSliderInputClicked(input) {
 }
 
 function onCommentsInput(comments) {
-    comments.style.height = 'auto';
-    comments.style.height = (comments.scrollHeight) + 'px';
-
+    autosizeTextArea(comments);
     saveControlState(comments);
 }
 
