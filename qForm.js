@@ -16,7 +16,7 @@ function _findDivAncestor(element) {
         }
     }
     var parent = element.parentNode;
-    for (i = 0; (i < 3) && (parent != null); i++) {
+    for (var i = 0; (i < 3) && (parent != null); i++) {
         if (parent.tagName == "DIV") break;
         parent = parent.parentElement;
     }
@@ -41,7 +41,6 @@ var lastVisitedSegment = 0;
 function addState(segIndex, key, value) {
     if (!formState.hasOwnProperty(segIndex)) formState[segIndex] = {};
     formState[segIndex][key] = value;
-    return true;
 }
 
 function removeState(segIndex, key) {
@@ -51,7 +50,7 @@ function removeState(segIndex, key) {
 }
 
 function generateName(element, segIndex, eIndex) {
-    return "q_" + element.type + "_" + segIndex + "_" + eIndex;
+    return ["q", element.type, segIndex, eIndex].join("_");
 }
 
 function extractName(text) {
@@ -71,10 +70,10 @@ function saveControlState(control) {
     // Save the state of the new input for this control.
     // It is required to track it live in case the user hits the broswer's builtin 'forward' or 'back'
     // navigation buttons bypassing our own buttons, so we need to save state every time.
-    var isSaved = saveInputState(control.name);
+    saveInputState(control.name);
 
-    // If the field exists now, then it's not required anymore.
-    if (isSaved) removeRequiredField(control.name);
+    // Update required status.
+    enforceInput(control.name);
 }
 
 // This function stores the status of the relevant HTML control(s) in the current page.
@@ -83,47 +82,38 @@ function saveInputState(fieldName) {
     // Lookup the field in our records.
     for (i = 0; i < segmentFields.length; i++) {
         var fieldInfo = segmentFields[i];
-        var curFieldName = fieldInfo[0];
         var isRequired = fieldInfo[3];
         var tagInfo = extractName(fieldName);
         var type = tagInfo[0];
         var segIndex = fieldInfo[1];
 
-        // Skip this field if it doesn't match.
-        if (curFieldName != fieldName) {
-            if (!((fieldName.search("checkbox") != -1) && (fieldName.search(curFieldName) != -1))) continue;
-            fieldName = curFieldName;
-        }
-
-        if ((type == "inputline") || (type == "inputmulti")) {
+        if ((type == "inputline") || (type == "inputmultiline")) {
             var value = document.getElementsByName(fieldName)[0].value;
-            if (value.length > 0) return addState(segIndex, fieldName, value);
+            if (value.length > 0) addState(segIndex, fieldName, value);
             else removeState(segIndex, fieldName);
         } else if (type == "checkbox") {
-            var checks = document.querySelectorAll("input[name^=" + fieldName + "]:checked");
+            var checks = document.querySelectorAll("input[name=" + fieldName + "]:checked");
             if (checks.length > 0) {
                 var results = [];
                 for (var j = 0; j < checks.length; j++) {
                     results.push(checks[j].value);
                 }
-                return addState(segIndex, fieldName, results);
+                addState(segIndex, fieldName, results);
             } else removeState(segIndex, fieldName);
         } else if (type == "multi") {
             var multis = document.querySelectorAll("input[name=" + fieldName + "]:checked");
-            if (multis.length > 0) return addState(segIndex, fieldName, multis[0].value);
+            if (multis.length > 0) addState(segIndex, fieldName, multis[0].value);
             else removeState(segIndex, fieldName);
         } else if (type == "dropdown") {
             var value = document.getElementsByName(fieldName)[0].selectedIndex;
             if (isRequired) {
                 // If it's required and it's the default value don't record it.
-                if (value > 0) return addState(segIndex, fieldName, value);
+                if (value > 0) addState(segIndex, fieldName, value);
                 // If user changed back to default value, remove state.
                 else removeState(segIndex, fieldName);
-            } else return addState(segIndex, fieldName, value);
+            } else addState(segIndex, fieldName, value);
         }
     }
-    
-    return false;
 }
 
 function updateSliderLabelStyle(label) {
@@ -157,9 +147,18 @@ function loadInputState(segIndex) {
             element.value = formState[segIndex][fieldName];
             autosizeTextArea(element);
         } else if (type == "checkbox") {
+            // Retrieve array of checked values.
             var checks = formState[segIndex][fieldName];
-            for (var i = 0; i < checks.length; i++) {
-                document.getElementsByName(fieldName + "_" + checks[i])[0].checked = 1;
+            // Retrieve array of all checkboxes with same field name.
+            var elements = document.getElementsByName(fieldName);
+            // Cross check which ones to turn on.
+            for (var j = 0; j < elements.length; j++) {
+                for (var i = 0; i < checks.length; i++) {
+                    if (elements[j].value == checks[i]) {
+                        elements[j].checked = 1;
+                        break;
+                    }
+                }
             }
         } else if (type == "multi") {
             var element = document.getElementsByName(fieldName)[formState[segIndex][fieldName]];
@@ -179,37 +178,64 @@ function removeRequiredField(self) {
     }
 }
 
-function focusOnRequiredField(fieldName) {   
+function focusOnRequiredField(fieldName) {
     // Change question's CSS to 'required'...
     var parent = _findDivAncestor(fieldName);
     if (parent != null) {
         // Add the 'required' class to the div element.
         parent.classList.add("required");
+        // Bring back the view to the right control.
+        parent.scrollIntoView(true);
     }
-    return;
 }
 
 // Scans to see whether all required fields are filled.
 // Otherwise lets the user know she needs to fill it in.
 // Stops upon the first input field that isn't filled in.
 // If all's good then true is returned, otherwise false.
-function enforceInput(segIndex) {
+// This function can also operate on the given input field and
+// change the 'required' class accordingly to its validation.
+function enforceInput(fieldName) {
     for (var i = 0; i < segmentFields.length; i++) {
         var fieldInfo = segmentFields[i];
-        var fieldName = fieldInfo[0];
+        var curFieldName = fieldInfo[0];
         var isRequired = fieldInfo[3];
         var maxOptions = fieldInfo[2];
+        var segIndex = fieldInfo[1];
 
-        if (!isRequired) continue; // Skip unrequired fields.
+        // If a field name is given make sure we only handle that one.
+        if (fieldName != null) {
+            if (fieldName != curFieldName) {
+                continue;
+            }
+        } else {
+            // If we scan all elements, then skip the unrequired ones.
+            if (!isRequired) continue;
+        }
 
-        var tagInfo = extractName(fieldName);
+        var tagInfo = extractName(curFieldName);
         var type = tagInfo[0];
         var eIndex = tagInfo[2];
-
-        var found = formState.hasOwnProperty(segIndex) && formState[segIndex].hasOwnProperty(fieldName);
+        var found = formState.hasOwnProperty(segIndex) && formState[segIndex].hasOwnProperty(curFieldName);
         if (found) {
-            // For multi-choice we have to make sure the 'other' input is not empty if exists and chosen.
-            if ((type == "multi") && (maxOptions == formState[segIndex][fieldName])) {
+            var checkMax = false;
+            // For multi-choice or checkboxes we have to make sure the 'other' input is not empty if exists and chosen.
+            if (type == "multi") {
+                // Calculate the correct name of the 'other' input text field.
+                if (maxOptions == formState[segIndex][curFieldName]) checkMax = true;
+            }
+            else if (type == "checkbox") {
+                var values = formState[segIndex][curFieldName];
+                // Scan all checkboxes to see the 'other' one is checked too.
+                for (var v in values) {
+                    if (values[v] == maxOptions) {
+                        checkMax = true;
+                        break;
+                    }
+                }
+            }
+
+            if (checkMax) {
                 // Calculate the correct name of the 'other' input text field.
                 var textOtherName = generateName({
                     "type": "inputline"
@@ -219,11 +245,17 @@ function enforceInput(segIndex) {
             }
         }
 
-        // If we didn't find an input for the required field, we can fail now.
+        // If we didn't find an input for the required field, we can fail now. It means the field isn't valid.
         if (!found) {
-            console.log("Input is required for " + fieldName); // TODO: REMOVE ME
-            focusOnRequiredField(fieldName);
+            // Focus first incomplete field and stop, better UX.
+            if (isRequired) focusOnRequiredField(curFieldName);
             return false;
+        }
+
+        // If we scan for a specific control, then remove its required as it was found to be valid.
+        if (fieldName != null) {
+            removeRequiredField(curFieldName);
+            break;
         }
     }
 
@@ -249,7 +281,7 @@ function submitForm() {
 // Add an entry to the history of navigation.
 function updateHistory(index, shouldReplace) {
     if (window.history) {
-        var context = {"index":index};
+        var context = {"index": index};
         if (shouldReplace) {
             history.replaceState(context, "", `?id=${index}`);
             document.title = getSegmentTitle(index);
@@ -257,7 +289,6 @@ function updateHistory(index, shouldReplace) {
         else {
             history.pushState(context, "", `?id=${index}`);
             document.title = getSegmentTitle(index);
-            
         }
         return true;
     }
@@ -275,7 +306,7 @@ function doAction(action, index) {
     // Have to check all required fields are filled, else re-focus user and show error.
     // Do it after step 1 as we will be using the currently stored input state.
     // Always let going backwards, so enforce on forward.
-    if ((action == "next") && !enforceInput(index)) {
+    if ((action == "next") && !enforceInput(null)) {
         // Don't continue if not all fields are filled.
         return;
     }
@@ -283,13 +314,13 @@ function doAction(action, index) {
     if (action == "submit") {
         submitForm();
     } else if (action == "next") {
-        
+
         // Keep track of our own last visited segment.
         // This is important to keep the browser's own 'back' and 'forward' buttons in sync with ours.
         // If we've never been to the next segment, then add it to history and show it.
         if (index + 1 > lastVisitedSegment) {
             lastVisitedSegment = index + 1;
-            
+
             // Add history state.
             updateHistory(index + 1, false);
             // Now show new segment.
@@ -336,17 +367,13 @@ function onOtherLabelClicked(self, pairedElementName) {
         document.getElementsByName(pairedElementName)[0].focus();
         document.getElementsByName(pairedElementName)[0].select();
     }
-    
+
     // Save state for self control element.
     saveControlState(self);
 }
 
 // This is the onclick handler for the "other" input text field.
 function onOtherInputClicked(self, pairedElement) {
-    if (typeof pairedElement == "string") {
-        pairedElement = document.getElementsByName(pairedElement)[0];
-    }
-
     // Only if the checkbox or radio isn't checked then simulate a click
     // (so the relevant handler is called too).
     if (!pairedElement.checked) {
@@ -366,7 +393,7 @@ function handleElement(element, segIndex, eIndex) {
     var name = generateName(element, segIndex, eIndex);
 
     if (element.type == "inputmultiline") {
-        output += "<textarea rows=10 cols=50% name='" + name + "' oninput='saveControlState(this)'></textarea>";
+        output += "<textarea class='textarea-autosize' rows=1 name='" + name + "' oninput='onCommentsInput(this)'></textarea>";
     } else if (element.type == "inputline") {
         output += "<input type='text' oninput='saveControlState(this)' name='" + name + "'>";
     } else if (element.type == "multi") {
@@ -399,17 +426,16 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "checkbox") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<label><input type='checkbox' onclick='saveControlState(this)' name='" + name + "_" + i + "' value='" + i + "'>" + element.options[i] + "</label>";
+            output += "<label><input type='checkbox' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
             textName = generateName({
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
-            var maxName =  name + "_" + max;
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<label><input type='checkbox' name='" + maxName + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, \"" + maxName + "\")'>";
+            output += "<label><input type='checkbox' name='" + name + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
+            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -442,7 +468,6 @@ function handleElements(seg, segIndex) {
     }
     return output;
 }
-
 
 function onSliderInputClicked(input) {
     label = input.parentNode;
@@ -494,12 +519,12 @@ function handleQuestions(seg, segIndex) {
         var name = generateName({
             "type": "multi"
         }, segIndex, i);
-        
+
         // Add minimum label.
         output += `
             <div class='btn btn-secondary disabled'>${seg.slide[3]}</div>
         `;
-        
+
         // Add digits.
         for (var j = seg.slide[0]; j <= max; j++) {
             output += `
@@ -508,7 +533,7 @@ function handleQuestions(seg, segIndex) {
                 </label>
             `;
         }
-        
+
         // Add maximum label.
         output += `
             <div class='btn btn-secondary disabled'>${seg.slide[2]}</div>
@@ -587,9 +612,9 @@ function showSegment(index) {
 
     // Add progress bar for non-title pages.
     if (index > 0) {
-        var total_segments = formJSON.segments.length;
+        var total_segments = formJSON.segments.length - 1; // Exclude the artificial 'thanks' segment.
         var progress = Math.round(index / total_segments * 100);
-    
+
         output += `
             <div class="progress">
             <div class="progress-bar"
@@ -652,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return "Are you sure you want to reload and lose information?";
             };
         }
-        
+
         // Support history navigation.
         window.addEventListener('popstate', loadFromHistory);
 
