@@ -395,7 +395,7 @@ function handleElement(element, segIndex, eIndex) {
     if (element.type == "inputmultiline") {
         output += "<textarea class='textarea-autosize' rows=1 name='" + name + "' oninput='onCommentsInput(this)'></textarea>";
     } else if (element.type == "inputline") {
-        output += "<input type='text' oninput='saveControlState(this)' name='" + name + "'>";
+        output += "<input type='text' class='inputline' oninput='saveControlState(this)' name='" + name + "'>";
     } else if (element.type == "multi") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
@@ -409,7 +409,7 @@ function handleElement(element, segIndex, eIndex) {
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
             output += "<label><input type='radio' name='" + name + "' value='" + max + "' onchange='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            output += "<input type='text' class='inputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -427,6 +427,7 @@ function handleElement(element, segIndex, eIndex) {
         max = element.options.length;
         for (i = 0; i < max; i++) {
             output += "<label><input type='checkbox' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
+            output += "<br>";
         }
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
@@ -435,8 +436,8 @@ function handleElement(element, segIndex, eIndex) {
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
             output += "<label><input type='checkbox' name='" + name + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
-            output += "<br>"; // REMOVE ME
+            output += "<input type='text' class='inputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            output += "<br>";
 
             // Add the new 'other' element to the list.
             addField(textName, segIndex, 0, 0);
