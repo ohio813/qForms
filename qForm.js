@@ -392,6 +392,9 @@ function handleElement(element, segIndex, eIndex) {
     // Generate a unique name for the newly created field with indicators of its type and position.
     var name = generateName(element, segIndex, eIndex);
 
+    // Extract element's required boolean.
+    var isRequired = (element.hasOwnProperty("required") && (element.required == 1));
+
     if (element.type == "inputmultiline") {
         output += "<textarea class='textarea-autosize' rows=1 name='" + name + "' oninput='onCommentsInput(this)'></textarea>";
     } else if (element.type == "inputline") {
@@ -413,7 +416,7 @@ function handleElement(element, segIndex, eIndex) {
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
-            addField(textName, segIndex, 0, 0);
+            addField(textName, segIndex, 0, isRequired);
         }
     } else if (element.type == "dropdown") {
         output += "<select onchange='saveControlState(this)' name='" + name + "'>";
@@ -440,14 +443,11 @@ function handleElement(element, segIndex, eIndex) {
             output += "<br>";
 
             // Add the new 'other' element to the list.
-            addField(textName, segIndex, 0, 0);
+            addField(textName, segIndex, 0, isRequired);
         }
     } else throw ("Unsupported element type!");
 
-    // TODO: consider adding a div for "required-field error".
-
     // Add the new element to the list.
-    var isRequired = (element.hasOwnProperty("required") && (element.required == 1));
     if (!isRequired) max = -1; // Ignore max options if it's not a required field.
     addField(name, segIndex, max, isRequired);
 
