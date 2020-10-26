@@ -210,7 +210,9 @@ function enforceInput(fieldName) {
             }
         } else {
             // If we scan all elements, then skip the unrequired ones.
-            if (!isRequired) continue;
+            // If it's required and it's an "other" input liner then skip it too,
+            // because it's scanned only as part of its parent.
+            if (!isRequired || (curFieldName.search("_other") != -1)) continue;
         }
 
         var tagInfo = extractName(curFieldName);
