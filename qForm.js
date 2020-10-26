@@ -266,12 +266,11 @@ function enforceInput(fieldName) {
 }
 
 function submitForm() {
-    // HTTP POST request with user's input.
+    // HTTP POST request with user's input as a JSON message.
     var http = new XMLHttpRequest();
     http.open("POST", formMeta.postURL, true);
-    http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-    var params = "blob=" + JSON.stringify(formState);
-    http.send(params);
+    http.setRequestHeader("Content-type", "application/json; charset=UTF-8");
+    http.send(JSON.stringify(formState));
     //http.onload = function() { alert(http.responseText); }
 
     // Show thank you message.
