@@ -511,7 +511,7 @@ function handleQuestions(seg, segIndex) {
         // Open slider div.
         output += `
             <div class='question'>
-            <p class='question-text'>${seg.subQuestions[i]}</p>
+            <p class='question-text'>${i+1}) ${seg.subQuestions[i]}</p>
             <div class='text-center'>
             <div class='question-slider btn-group btn-group-toggle'>
         `;
