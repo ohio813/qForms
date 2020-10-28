@@ -70,3 +70,7 @@
     border-top-right-radius: 0.5rem;
     border-bottom-color: #1890ff;
 }
+
+.question textarea {
+    background-color: #f1f8ff;
+}
