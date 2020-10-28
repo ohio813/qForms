@@ -522,15 +522,18 @@ function handleQuestions(seg, segIndex) {
             "type": "multi"
         }, segIndex, i);
 
+        var smallClass = "";
+        if (window.innerWidth < 800) smallClass = "btn-sm";
+
         // Add minimum label.
         output += `
-            <div class='btn btn-secondary disabled'>${seg.slide[3]}</div>
+            <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[3]}</div>
         `;
 
         // Add digits.
         for (var j = seg.slide[0]; j <= max; j++) {
             output += `
-                <label class="btn btn-secondary">
+                <label class="btn btn-secondary ${smallClass}">
                     <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onSliderInputClicked.name}(this)'>${j}
                 </label>
             `;
@@ -538,7 +541,7 @@ function handleQuestions(seg, segIndex) {
 
         // Add maximum label.
         output += `
-            <div class='btn btn-secondary disabled'>${seg.slide[2]}</div>
+            <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[2]}</div>
         `;
 
         // Close slider div,
