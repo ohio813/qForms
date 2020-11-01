@@ -117,10 +117,13 @@ function saveInputState(fieldName) {
 }
 
 function updateSliderLabelStyle(label) {
-    if (label.firstElementChild.checked)
+    if (label.firstElementChild.checked) {
+        label.classList.add("btn-dark");
         label.classList.add("active");
-    else
+    } else {
+        label.classList.remove("btn-dark");
         label.classList.remove("active");
+    }
 }
 
 function isSliderLabelActive(label) {
