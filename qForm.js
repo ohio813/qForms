@@ -166,7 +166,8 @@ function loadInputState(segIndex) {
         } else if (type == "multi") {
             var element = document.getElementsByName(fieldName)[formState[segIndex][fieldName]];
             element.checked = 1;
-            updateSliderLabelStyle(element.parentNode);
+            if (element.parentElement.classList.contains('slider'))
+                updateSliderLabelStyle(element.parentNode);
         } else if (type == "dropdown") {
             document.getElementsByName(fieldName)[0].selectedIndex = formState[segIndex][fieldName];
         }
@@ -536,7 +537,7 @@ function handleQuestions(seg, segIndex) {
         // Add digits.
         for (var j = seg.slide[0]; j <= max; j++) {
             output += `
-                <label class="btn btn-secondary ${smallClass}">
+                <label class="slider btn btn-secondary ${smallClass}">
                     <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onSliderInputClicked.name}(this)'>${j}
                 </label>
             `;
