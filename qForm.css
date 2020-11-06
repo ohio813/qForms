@@ -42,6 +42,16 @@
 }
 
 .inputline {
+	width: 80%;
+    border: 0;
+    outline: 0;
+    border-bottom: 1px solid black;
+    background-color: inherit;
+    margin-right: 4px;
+    margin-left: 4px;
+}
+
+.otherinputline {
     border: 0;
     outline: 0;
     border-bottom: 1px solid black;

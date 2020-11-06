@@ -417,7 +417,7 @@ function handleElement(element, segIndex, eIndex) {
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
             output += "<label><input type='radio' name='" + name + "' value='" + max + "' onchange='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' class='inputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            output += "<input type='text' class='otherinputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>"; // REMOVE ME
 
             // Add the new 'other' element to the list.
@@ -444,7 +444,7 @@ function handleElement(element, segIndex, eIndex) {
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
             output += "<label><input type='checkbox' name='" + name + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' class='inputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            output += "<input type='text' class='otherinputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>";
 
             // Add the new 'other' element to the list.
