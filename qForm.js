@@ -1,6 +1,12 @@
 var formJSON = {}; // This is the form JSON data with all questions.
 var formMeta = {}; // This is the meta data for language and UI.
 
+var statsJSON = null; // This is the data of statistics of all users, only in view mode.
+var formMode = 0; // Default mode is take user's input. If set to 1 by stats data loader, then present the user's data in readonly.
+var formUid = null; // UID of user in readonly if supplied via URL param.
+
+var FORM_MODE_READONLY = 1;
+
 // UTILS
 
 function _formatText(text) {
@@ -22,6 +28,25 @@ function _findDivAncestor(element) {
     }
     return parent;
 }
+
+function _lazyLoadScript(link) {
+    var newScript = document.createElement('script');
+    newScript.src = link;
+    newScript.type = "text/javascript";
+    document.getElementsByTagName("head")[0].appendChild(newScript);
+}
+
+function _getCSSClass(className) {
+    for (var i = 0; i < document.styleSheets.length; i++) {
+        var rules = document.styleSheets[i]["cssRules"];
+        for (var j = 0; j < rules.length; j++) {
+            if (rules[j].selectorText == className) return rules[j];
+        }
+    }
+
+    return null;
+}
+
 
 // GLOBALS:
 // ----------------
@@ -67,6 +92,9 @@ function resetFields() {
 
 // This function is called every time a field has new input.
 function saveControlState(control) {
+
+    if (formMode == FORM_MODE_READONLY) return; // Readonly mode ignores updating state.
+    
     // Save the state of the new input for this control.
     // It is required to track it live in case the user hits the broswer's builtin 'forward' or 'back'
     // navigation buttons bypassing our own buttons, so we need to save state every time.
@@ -130,9 +158,9 @@ function isSliderLabelActive(label) {
     return label.classList.contains("active")
 }
 
-function autosizeTextArea(textArea) {
-    textArea.style.height = 'auto';
-    textArea.style.height = (textArea.scrollHeight) + 'px';
+function autosizeTextArea(textControl) {
+    textControl.style.height = 'auto';
+    textControl.style.height = (textControl.scrollHeight) + 'px';
 }
 
 // This function restores the status of the HTML controls from our bookkeeping.
@@ -165,6 +193,7 @@ function loadInputState(segIndex) {
             }
         } else if (type == "multi") {
             var element = document.getElementsByName(fieldName)[formState[segIndex][fieldName]];
+            if (element == null) continue; // Skip sliders if they aren't displayed.
             element.checked = 1;
             if (element.parentElement.classList.contains('slider'))
                 updateSliderLabelStyle(element.parentNode);
@@ -200,6 +229,9 @@ function focusOnRequiredField(fieldName) {
 // This function can also operate on the given input field and
 // change the 'required' class accordingly to its validation.
 function enforceInput(fieldName) {
+
+    if (formMode == FORM_MODE_READONLY) return true; // Readonly mode ignores enforcing controls.
+
     for (var i = 0; i < segmentFields.length; i++) {
         var fieldInfo = segmentFields[i];
         var curFieldName = fieldInfo[0];
@@ -287,12 +319,15 @@ function submitForm() {
 function updateHistory(index, shouldReplace) {
     if (window.history) {
         var context = {"index": index};
+        uidParam = "";
+        // Add uid param in view mode.
+        if ((formMode != FORM_MODE_READONLY) && (formUid != null)) uidParam = "&uid=" + formUid;
         if (shouldReplace) {
-            history.replaceState(context, "", `?id=${index}`);
+            history.replaceState(context, "", `?id=${index}${uidParam}`);
             document.title = getSegmentTitle(index);
         }
         else {
-            history.pushState(context, "", `?id=${index}`);
+            history.pushState(context, "", `?id=${index}${uidParam}`);
             document.title = getSegmentTitle(index);
         }
         return true;
@@ -317,7 +352,7 @@ function doAction(action, index) {
     }
 
     if (action == "submit") {
-        submitForm();
+        submitForm(); // Submit the form only in input mode.
     } else if (action == "next") {
 
         // Keep track of our own last visited segment.
@@ -354,7 +389,9 @@ function handleButtons(index) {
 
         // Last page has button: submit.
         if (index == formJSON.segments.length - 1) {
-            output += `<button class='btn btn-primary' onclick='doAction("submit", 0)'>${formMeta.actionSubmitText}</button>`;
+            var disabled = "";
+            if (formMode == FORM_MODE_READONLY) disabled = "disabled";
+            output += `<button class='btn btn-primary' onclick='doAction("submit", 0)' ${disabled}>${formMeta.actionSubmitText}</button>`;
         } else {
             // Any other page: next.
             output += `<button class='btn btn-primary' onclick='doAction("next", ${index})'>${formMeta.actionNextText}</button>`;
@@ -400,31 +437,51 @@ function handleElement(element, segIndex, eIndex) {
     // Extract element's required boolean.
     var isRequired = (element.hasOwnProperty("required") && (element.required == 1));
 
+    // If we're in readonly mode, make sure all controls are disabled.
+    var disabled = "";
+    if (formMode == FORM_MODE_READONLY) disabled = "disabled";
+
     if (element.type == "inputmultiline") {
-        output += "<textarea class='textarea-autosize' rows=1 name='" + name + "' oninput='onCommentsInput(this)'></textarea>";
+        output += "<textarea class='textarea-autosize' rows=1 name='" + name + "' oninput='onTextInput(this)'></textarea>";
+        // Display texts from stats.
+        output += displayAllFreeText(name, segIndex);
     } else if (element.type == "inputline") {
-        output += "<input type='text' class='inputline' oninput='saveControlState(this)' name='" + name + "'>";
+        output += "<input type='text' class='inputline' oninput='saveControlState(this)' " + disabled + " name='" + name + "'>";
+        // Display texts from stats.
+        output += displayAllFreeText(name, segIndex);
     } else if (element.type == "multi") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<label><input type='radio' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
+            output += "<label><input type='radio' onclick='saveControlState(this)' " + disabled + " name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
+            try {
+				if (statsJSON[segIndex][name][i] != undefined) output += " - (" + statsJSON[segIndex][name][i] + "%)";
+			} catch (e) {}
             output += "<br>";
         }
+
+        // Handle 'other' for multi type.
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding radio button automatically upon entering input.
             textName = generateName({
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when selecting its radio.
-            output += "<label><input type='radio' name='" + name + "' value='" + max + "' onchange='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' class='otherinputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
-            output += "<br>"; // REMOVE ME
+            stats = "";
+            try {
+				if (statsJSON[segIndex][name][max] != undefined) stats = " - (" + statsJSON[segIndex][name][max] + "%)";
+			} catch (e) {}
+            output += "<label><input type='radio' " + disabled + " name='" + name + "' value='" + max + "' onchange='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + stats + "</label>";
+            output += "<input type='text' class='otherinputline' " + disabled + " name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            output += "<br>";
+
+            // Display texts from stats.
+            output += displayAllFreeText(textName, segIndex);
 
             // Add the new 'other' element to the list.
             addField(textName, segIndex, 0, isRequired);
         }
     } else if (element.type == "dropdown") {
-        output += "<select onchange='saveControlState(this)' name='" + name + "'>";
+        output += "<select onchange='saveControlState(this)' " + disabled + " name='" + name + "'>";
         output += "<option name='" + name + "' value='0' >" + formMeta.chooseText + "</option>";
         max = element.options.length;
         for (i = 0; i < max; i++) {
@@ -434,18 +491,30 @@ function handleElement(element, segIndex, eIndex) {
     } else if (element.type == "checkbox") {
         max = element.options.length;
         for (i = 0; i < max; i++) {
-            output += "<label><input type='checkbox' onclick='saveControlState(this)' name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
+            output += "<label><input type='checkbox' onclick='saveControlState(this)' " + disabled + " name='" + name + "' value='" + i + "'>" + element.options[i] + "</label>";
+            try {
+				if (statsJSON[segIndex][name][i] != undefined) output += " - (" + statsJSON[segIndex][name][i] + "%)";
+			} catch (e) {}
             output += "<br>";
         }
+
+        // Handle 'other' for multi type.
         if (element.hasOwnProperty("other") && (element.other == 1)) {
             // Add a text-input field that auto selects the corresponding check-box automatically upon entering input.
             textName = generateName({
                 "type": "inputline"
             }, segIndex, eIndex + "_other");
             // Add feature that focuses & selects the other input field when clicking on its check-box.
-            output += "<label><input type='checkbox' name='" + name + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + "</label>";
-            output += "<input type='text' class='otherinputline' name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
+            stats = "";
+            try {
+				if (statsJSON[segIndex][name][max] != undefined) stats = " - (" + statsJSON[segIndex][name][max] + "%)";
+			} catch (e) {}
+            output += "<label><input type='checkbox' " + disabled + " name='" + name + "' value='" + max + "' onclick='onOtherLabelClicked(this, \"" + textName + "\")'>" + formMeta.otherText + stats + "</label>";
+            output += "<input type='text' class='otherinputline' " + disabled + " name='" + textName + "' oninput='onOtherInputClicked(this, document.getElementsByName(\"" + name + "\")[" + max + "])'>";
             output += "<br>";
+
+            // Display texts from stats.
+            output += displayAllFreeText(textName, segIndex);
 
             // Add the new 'other' element to the list.
             addField(textName, segIndex, 0, isRequired);
@@ -492,9 +561,86 @@ function onSliderInputClicked(input) {
     saveControlState(input);
 }
 
-function onCommentsInput(comments) {
-    autosizeTextArea(comments);
-    saveControlState(comments);
+function onTextInput(textControl) {
+    autosizeTextArea(textControl);
+    saveControlState(textControl);
+}
+
+function displayAllFreeText(name, segIndex, displayHeader) {
+    var output = "";
+    if (formMode != FORM_MODE_READONLY) return output;
+    if (displayHeader == undefined) displayHeader = formMeta.otherText;
+    try {
+        var max = statsJSON[segIndex][name].length;
+        if (max > 0) {
+            output += `<u>${displayHeader} (${max}):</u><br>`;
+            for (var i = 0; i < max; i++) {
+                output += (i + 1) + ") " + _formatText(statsJSON[segIndex][name][i]) + "<br>";
+            }
+        }
+    } catch (e) {}
+    return output;
+}
+
+function displayQuestionStats(name, segIndex, seg, max) {
+    if (formMode != FORM_MODE_READONLY) return ["", null];
+    var output = "<br>";
+    output += `<canvas id='bar-chart_${name}'></canvas>`;
+
+    var labels = [];
+    var data = [];
+    var colors = [];
+
+    var defaultColor = '"' + _getCSSClass(".chart_default").style.color + '"';
+    var selectedColor = '"' + _getCSSClass(".chart_selected").style.color + '"';
+
+    for (var j = 0; j < max; j++) {
+        try {
+            colors[j] = defaultColor;
+            labels[j] = "\"" + (j + seg.slide[0]);
+            if (statsJSON[segIndex][name][j] != undefined) {
+                data[j] = "" + statsJSON[segIndex][name][j];
+                // Set a different color for the selected bar.
+                try {
+                    // If a user didn't answer this will raise an exception, so skip.
+                    if (formState[segIndex][name] == j) colors[j] = selectedColor;
+                } catch (e) {}
+            } else {
+                data[j] = "0";
+            }
+            if (j == 0) labels[j] += ` (${seg["slide"][3]})"`; // NO
+            else if (j == max - 1) labels[j] += ` (${seg["slide"][2]})"`; // YES
+            else labels[j] += '"';
+        } catch (e) {}
+    }
+    code = `
+    new Chart(document.getElementById("bar-chart_${name}"), {
+    type: 'bar',
+    data: {
+      labels: [${labels}],
+      datasets: [
+        {
+          label: "%",
+          data: [${data}],
+          backgroundColor: [${colors}]
+        }
+      ]
+    },
+    options: {
+      legend: {
+        display: false,
+        },
+      title: {
+        display: true,
+        text: '${formMeta.votesText}'
+      }
+    }
+    });
+    `;
+
+    var newScript = document.createElement('script');
+    newScript.text = code;
+    return [output, newScript];
 }
 
 function handleQuestions(seg, segIndex) {
@@ -502,6 +648,11 @@ function handleQuestions(seg, segIndex) {
 
     var i;
     var output = "";
+    var scripts = [];
+
+    // If we're in readonly mode, make sure all controls are disabled.
+    var disabled = "";
+    if (formMode == FORM_MODE_READONLY) disabled = "disabled";
 
     // Open question group div.
     output += `
@@ -529,33 +680,38 @@ function handleQuestions(seg, segIndex) {
         var smallClass = "";
         if (window.innerWidth < 800) smallClass = "btn-sm";
 
-        // Add minimum label.
-        output += `
-            <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[3]}</div>
-        `;
-
-        // Add digits.
-        for (var j = seg.slide[0]; j <= max; j++) {
+        // Show the slider only if it's input mode.
+        if (formMode != FORM_MODE_READONLY) {
+            // Add minimum label.
             output += `
-                <label class="slider btn btn-secondary ${smallClass}">
-                    <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onSliderInputClicked.name}(this)'>${j}
-                </label>
+                <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[3]}</div>
+            `;
+
+            // Add digits.
+            for (var j = seg.slide[0]; j <= max; j++) {
+                output += `
+                    <label class="slider btn btn-secondary ${smallClass}">
+                        <input type='radio' name='${name}' value='${j - seg.slide[0]}' onclick='${onSliderInputClicked.name}(this)' ${disabled}>${j}
+                    </label>
+                `;
+            }
+
+            // Add maximum label.
+            output += `
+                <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[2]}</div>
             `;
         }
 
-        // Add maximum label.
-        output += `
-            <div class='btn btn-secondary ${smallClass} disabled'>${seg.slide[2]}</div>
-        `;
-
         // Close slider div,
-        // Close centering div.
+        output += "</div>";
+
+		ret = displayQuestionStats(name, segIndex, seg, max);
+        output += ret[0];
+        scripts.push(ret[1]);
+
+		// Close centering div.
         // close question div.
-        output += `
-            </div>
-            </div>
-            </div>
-        `;
+		output += "</div></div>";
 
         addField(name, segIndex, max, 0);
     }
@@ -567,21 +723,23 @@ function handleQuestions(seg, segIndex) {
 
     if (seg.comments) {
         var name = generateName({
-            "type": "inputmulti"
+            "type": "inputmultiline"
         }, segIndex, 0);
 
         output += `
             <textarea class='textarea-autosize'
                       rows=1
                       name='${name}'
-                      oninput='${onCommentsInput.name}(this)'
-                      placeholder='${formMeta.commentsText}'></textarea>
+                      oninput='${onTextInput.name}(this)'
+                      placeholder='${formMeta.commentsText}' ${disabled}></textarea>
         `;
+
+        output += displayAllFreeText(name, segIndex, formMeta.commentsText);
 
         addField(name, segIndex, 0, 0);
     }
 
-    return output;
+    return [output, scripts];
 }
 
 // Returns the correct displayable question # by skipping elements that aren't "questions" type.
@@ -613,6 +771,7 @@ function getSegmentTitle(index) {
 function showSegment(index) {
     // HTML to output.
     var output = "";
+    var scripts = [];
 
     // Reset segmentFields list as we're changing segment.
     resetFields();
@@ -649,7 +808,10 @@ function showSegment(index) {
     if (seg.hasOwnProperty("elements")) {
         output += handleElements(seg, index);
     } else if (seg.hasOwnProperty("subQuestions")) {
-        output += handleQuestions(seg, index);
+        // This function can return scripts to execute as innerHTML doesn't run script tags.
+        ret = handleQuestions(seg, index);
+        output += ret[0];
+        scripts = ret[1];
     } else throw ("Bad segment type!");
 
     output += handleButtons(index);
@@ -657,60 +819,111 @@ function showSegment(index) {
 
     // Only after the new elements are presented, we can set their state if existing.
     loadInputState(index);
+
+    for (var i = 0; i < scripts.length; i++) {
+        if (scripts[i] != null) {
+            document.body.appendChild(scripts[i]);
+        }
+    }
 }
 
 function getFormDataUrl() {
     var dataElements = document.getElementsByTagName("qform-data");
     if (dataElements.length != 1)
         throw Error("Unexpected number of qform-data elements");
+    if (!dataElements[0].attributes.hasOwnProperty("src"))
+        throw Error("src attribute is missing from qform-data");
 
     return dataElements[0].attributes['src'].value;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    // Find user's JSON base path;
-    var basePath = getFormDataUrl();
+function startView() {
+    // Initialize our history here on first visit.
+    updateHistory(0, true);
 
-    // Load the meta data first.
-    var metaPath = basePath + "meta.json";
-    var ajax = new XMLHttpRequest();
-    ajax.onload = function () {
-        formMeta = JSON.parse(ajax.responseText);
+    // Force reloading question only in input mode.
+    if ((formMeta.reloadWarning == 1) && (formMode != FORM_MODE_READONLY)) {
+        document.body.onbeforeunload = function () {
+            return "Are you sure you want to reload and lose information?";
+        };
+    }
 
-        if (formMeta.hasOwnProperty("dir")) {
-            document.body.style.direction = formMeta.dir;
-        }
+    // This boots the whole UI!
+    segIndex = 0;
+    if (formMode == FORM_MODE_READONLY) segIndex = 1; // Skip welcome page.
+    showSegment(segIndex);
+}
 
-        if (formMeta.reloadWarning == 1) {
-            document.body.onbeforeunload = function () {
-                return "Are you sure you want to reload and lose information?";
-            };
-        }
+function statsDataLoaded(e) {
+    var info = JSON.parse(e.target.responseText);
+    if (info.hasOwnProperty("uid")) {
+        formState = info["uid"]["0"];
+        if (formState == null) formState = {};
+        formMode = FORM_MODE_READONLY;
+    }
+    if (info.hasOwnProperty("stats")) statsJSON = info["stats"];
 
-        // Support history navigation.
-        window.addEventListener('popstate', loadFromHistory);
+    startView();
+}
+
+function formDataLoaded(e) {
+    // Update the global with the loaded content.
+    formJSON = JSON.parse(e.target.responseText);
+
+    // Add the submission page.
+    var submissionObj = {};
+    submissionObj["type"] = "segment";
+    submissionObj["text"] = formMeta.submissionText;
+    submissionObj["elements"] = [];
+    formJSON.segments.push(submissionObj);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    var password = urlParams.get("password");
+    var uid = urlParams.get("uid");
+    formUid = uid;
+
+    // If we got some params, then fetch their data from the server.
+    if ((uid != undefined) || (password != undefined)) {
+
+        // Build the query param for the request.
+        var url = formMeta.statsURL + "?";
+        if (uid != undefined) url += "uid=" + uid + "&";
+        if (password != undefined) url += "password=" + password;
+
+        // Lazy load the chart link because we're about to present charts in read-only mode.
+        _lazyLoadScript("https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js");
 
         // Now load the actual questions data.
-        var ajaxForm = new XMLHttpRequest();
-        ajaxForm.onload = function () {
-            formJSON = JSON.parse(ajaxForm.responseText);
+        var ajaxStats = new XMLHttpRequest();
+        ajaxStats.onload = statsDataLoaded;
+        ajaxStats.open("GET", url);
+        ajaxStats.send(null);
+    } else {
+        startView();
+    }
+}
 
-            submissionObj = {};
-            submissionObj["type"] = "segment";
-            submissionObj["text"] = formMeta.submissionText;
-            submissionObj["elements"] = [];
-            formJSON.segments.push(submissionObj);
+function metaDataLoaded(e) {
+    formMeta = JSON.parse(e.target.responseText);
 
-            // Initialize our history here on first visit.
-            updateHistory(0, true);
+    if (formMeta.hasOwnProperty("dir")) {
+        document.body.style.direction = formMeta.dir;
+    }
 
-            // This boots the whole UI!
-            showSegment(0);
-        };
-        var jsonPath = basePath + ".json";
-        ajaxForm.open("GET", jsonPath, true);
-        ajaxForm.send(null);
-    };
-    ajax.open("GET", metaPath);
+    // Support history navigation.
+    window.addEventListener('popstate', loadFromHistory);
+
+    // Now load the actual questions data.
+    var ajaxForm = new XMLHttpRequest();
+    ajaxForm.onload = formDataLoaded;
+    ajaxForm.open("GET", getFormDataUrl() + ".json");
+    ajaxForm.send(null);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Load the meta data first.
+    var ajax = new XMLHttpRequest();
+    ajax.onload = metaDataLoaded;
+    ajax.open("GET", getFormDataUrl() + "meta.json");
     ajax.send(null);
 });

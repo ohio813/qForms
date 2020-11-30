@@ -1,5 +1,6 @@
 {
     "postURL": "http://example.com/submit.php",
+    "statsURL": "https://example.com/stats.php",
     "reloadWarning":1,
     "dir": "rtl",
     "actionStartText": "בואו נתחיל!",
@@ -11,6 +12,7 @@
     "chooseText": "יש לבחור",
     "commentsText": "הערות",
     "requiredText": "יש למלא את השדה הזה",
-    "submissionText": "סיימת את השאלון! כל הכבוד, האם תרצה להגיש אותו כעת?",
-    "actionThanksText": "<h3>תודה שענית על השאלות שלנו!</h3>"
+    "submissionText": "סיימת את השאלון! כל הכבוד, האם תרצה/י להגיש אותו כעת?",
+    "actionThanksText": "<h3>תודה שענית על השאלות שלנו!</h3>",
+    "votesText": "הבחירה שלך אל מול שאר ההצבעות"
 }
